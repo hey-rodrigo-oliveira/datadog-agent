@@ -175,12 +175,16 @@ func (l *LocalService) ShouldForceFlushAllOnForceFlushToSerializer() bool {
 	return false
 }
 
+func isUnsupportedArch(arch string) bool {
+	return arch != "amd64" && arch != "arm64"
+}
+
 // GetCloudServiceType TODO: Refactor to avoid leaking individual service implementation details into the interface layer
 //
 //nolint:revive // TODO(SERV) Fix revive lin
 func GetCloudServiceType() CloudService {
 
-	if runtime.GOARCH != "amd64" {
+	if isUnsupportedArch(runtime.GOARCH) {
 		log.Errorf("serverless-init is running on an unsupported architecture (%s). Monitoring may behave unexpectedly.", runtime.GOARCH)
 	}
 
@@ -201,6 +205,10 @@ func GetCloudServiceType() CloudService {
 
 	if isAppService() {
 		return &AppService{}
+	}
+
+	if isMicroVM() {
+		return &MicroVM{}
 	}
 
 	log.Warnf("serverless-init could not detect a supported service. Monitoring may be limited.")

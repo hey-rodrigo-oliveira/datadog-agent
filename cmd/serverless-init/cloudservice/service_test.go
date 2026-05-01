@@ -10,7 +10,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	serverlessenv "github.com/DataDog/datadog-agent/pkg/serverless/env"
 )
+
+// TestIsUnsupportedArch pins the set of architectures that serverless-init
+// supports. amd64 and arm64 (added for MicroVM) must not trigger the warning;
+// everything else must.
+func TestIsUnsupportedArch(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		assert.False(t, isUnsupportedArch(arch), "%s must be considered supported", arch)
+	}
+	for _, arch := range []string{"386", "mips", "mips64", "riscv64", "s390x", ""} {
+		assert.True(t, isUnsupportedArch(arch), "%s must be considered unsupported", arch)
+	}
+}
 
 func TestGetCloudServiceType(t *testing.T) {
 	assert.Equal(t, "local", GetCloudServiceType().GetOrigin())
@@ -35,4 +49,21 @@ func TestGetCloudServiceTypeForCloudRunJob(t *testing.T) {
 	// Verify it's the correct type
 	_, ok := cloudService.(*CloudRunJobs)
 	assert.True(t, ok)
+}
+
+func TestGetCloudServiceTypeMicroVM(t *testing.T) {
+	t.Setenv(serverlessenv.MicroVMImageARNEnvVar, "arn:aws:lambda:us-east-1:123456789012:microvm-image:my-image")
+	svc := GetCloudServiceType()
+	_, ok := svc.(*MicroVM)
+	assert.True(t, ok, "expected MicroVM CloudService")
+}
+
+func TestGetCloudServiceTypeMicroVMNotWhenCloudRunAlsoSet(t *testing.T) {
+	// Cloud Run takes priority — both would never be set in practice,
+	// but the ordering must be explicit.
+	t.Setenv(ServiceNameEnvVar, "my-service")
+	t.Setenv(serverlessenv.MicroVMImageARNEnvVar, "arn:aws:lambda:us-east-1:123456789012:microvm-image:my-image")
+	svc := GetCloudServiceType()
+	_, ok := svc.(*CloudRun)
+	assert.True(t, ok, "CloudRun should take priority over MicroVM")
 }
