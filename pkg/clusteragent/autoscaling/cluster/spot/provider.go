@@ -12,6 +12,11 @@ import (
 	"errors"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
+
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
@@ -46,6 +51,10 @@ func StartSpotScheduling(ctx context.Context, clusterID string, wlm workloadmeta
 		return tags
 	}
 
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: apiCl.Cl.CoreV1().Events("")})
+	eventRecorder := newSpotEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "datadog-spot-scheduler"}))
+
 	cfg := ReadConfig(pkgconfigsetup.Datadog())
 	tel := newTelemetry(localSender, isLeaderFunc, globalTagsFunc)
 	s := newScheduler(cfg, wlm,
@@ -54,7 +63,8 @@ func StartSpotScheduling(ctx context.Context, clusterID string, wlm workloadmeta
 		apiCl.DynamicInformerCl,
 		newWLMPodLister(wlm),
 		isLeaderFunc,
-		tel)
+		tel,
+		eventRecorder)
 	s.Start(ctx)
 
 	return s, nil

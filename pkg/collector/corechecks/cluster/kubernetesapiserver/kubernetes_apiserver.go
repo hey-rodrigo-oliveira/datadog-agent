@@ -196,6 +196,11 @@ func (k *KubeASCheck) Configure(senderManager sender.SenderManager, _ uint64, co
 			Source: "datadog-cluster-autoscaler",
 		})
 	}
+	if pkgconfigsetup.Datadog().GetBool("autoscaling.cluster.spot.enabled") {
+		k.instance.CollectedEventTypes = append(k.instance.CollectedEventTypes, collectedEventType{
+			Source: "datadog-spot-scheduler",
+		})
+	}
 
 	// When we use both bundled and unbundled transformers, we apply two filters: filtered_event_types and collected_event_types.
 	// When we use only the bundled transformer, we apply filtered_event_types.
