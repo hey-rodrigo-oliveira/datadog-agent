@@ -14,15 +14,15 @@ import (
 	serverlessenv "github.com/DataDog/datadog-agent/pkg/serverless/env"
 )
 
-// TestIsUnsupportedArch pins the set of architectures that serverless-init
-// supports. amd64 and arm64 (added for MicroVM) must not trigger the warning;
-// everything else must.
-func TestIsUnsupportedArch(t *testing.T) {
+// TestIsSupportedArch pins the set of architectures that serverless-init
+// supports. amd64 and arm64 (added for MicroVM) must return true; everything
+// else must return false.
+func TestIsSupportedArch(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
-		assert.False(t, isUnsupportedArch(arch), "%s must be considered supported", arch)
+		assert.True(t, isSupportedArch(arch), "%s must be considered supported", arch)
 	}
 	for _, arch := range []string{"386", "mips", "mips64", "riscv64", "s390x", ""} {
-		assert.True(t, isUnsupportedArch(arch), "%s must be considered unsupported", arch)
+		assert.False(t, isSupportedArch(arch), "%s must be considered unsupported", arch)
 	}
 }
 
