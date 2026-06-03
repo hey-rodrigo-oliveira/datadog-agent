@@ -15,6 +15,8 @@ go_library(
         "fim_others.go",
         "fim_unix.go",
         "model.go",
+        "model_linux.go",
+        "model_others.go",
         "opts.go",
         "policy.go",
         "policy_dir.go",
@@ -43,7 +45,15 @@ go_library(
         "@com_github_spf13_cast//:cast",
         "@in_yaml_go_yaml_v3//:yaml",
         "@org_uber_go_atomic//:atomic",
-    ],
+    ] + select({
+        "@rules_go//go/platform:android": [
+            "//pkg/security/ebpf/probes/rawpacket",
+        ],
+        "@rules_go//go/platform:linux": [
+            "//pkg/security/ebpf/probes/rawpacket",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
