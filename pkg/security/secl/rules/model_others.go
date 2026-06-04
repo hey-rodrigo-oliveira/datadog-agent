@@ -8,8 +8,10 @@
 // Package rules holds rules related files
 package rules
 
+import "errors"
+
 // validateBPFFilter is a no-op on non-Linux platforms where the network_filter
 // action (and the eBPF raw packet compiler) is not supported.
 func validateBPFFilter(_ string) error {
-	return nil
+	return errors.New("BPF Filters are supported on this platform")
 }
