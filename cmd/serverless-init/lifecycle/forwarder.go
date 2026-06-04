@@ -36,12 +36,11 @@ type Forwarder struct {
 	maxResponseBodyBytes int64         // default defaultMaxResponseBodyBytes; cap on user-app body surfaced to platform
 }
 
-// NewForwarder constructs a Forwarder targeting 127.0.0.1:<port> with default
-// timeouts and the default response-body cap. The 30s forwardTimeout is sized
-// well under the tightest AWS Lambda MicroVM platform bound (/terminate's 60s)
-// while leaving real time for user-app drain/warmup work and headroom for the
-// agent's own flush.
-func NewForwarder(port int) *Forwarder {
+// NewForwarder constructs a Forwarder targeting 127.0.0.1:<port>. The forwardTimeout
+// is used for /launch, /resume, /suspend, and /terminate; readyTimeout for /ready;
+// validateTimeout for /validate. Callers should pass the wire.go default constants
+// or values parsed from the DD_SERVERLESS_MICROVM_*_TIMEOUT_MS env vars.
+func NewForwarder(port int, forwardTimeout, readyTimeout, validateTimeout time.Duration) *Forwarder {
 	return &Forwarder{
 		target: fmt.Sprintf("http://127.0.0.1:%d", port),
 		// DisableKeepAlives prevents the transport from caching idle connections.
@@ -53,9 +52,9 @@ func NewForwarder(port int) *Forwarder {
 		client: &http.Client{
 			Transport: &http.Transport{DisableKeepAlives: true},
 		},
-		forwardTimeout:       30 * time.Second,
-		readyTimeout:         60 * time.Second,
-		validateTimeout:      60 * time.Second,
+		forwardTimeout:       forwardTimeout,
+		readyTimeout:         readyTimeout,
+		validateTimeout:      validateTimeout,
 		maxResponseBodyBytes: defaultMaxResponseBodyBytes,
 	}
 }
