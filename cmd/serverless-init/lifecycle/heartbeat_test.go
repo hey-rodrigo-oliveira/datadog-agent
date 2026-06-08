@@ -18,13 +18,13 @@ import (
 
 func newTestHeartbeat(interval time.Duration) (*Heartbeat, *mockMetricEmitter) {
 	emitter := &mockMetricEmitter{}
-	hb := NewHeartbeat(interval, emitter, metrics.MetricSourceAWSMicroVMEnhanced, "test-arn")
+	hb := NewHeartbeat(interval, emitter, metrics.MetricSourceAWSMicroVMEnhanced, []string{"microvm_image_arn:test-arn"})
 	return hb, emitter
 }
 
 func TestNewHeartbeat_NonPositiveIntervalFallsBackToDefault(t *testing.T) {
 	for _, in := range []time.Duration{0, -1, -time.Second} {
-		hb := NewHeartbeat(in, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, "")
+		hb := NewHeartbeat(in, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, nil)
 		assert.Equal(t, DefaultHeartbeatInterval, hb.interval, "interval=%s should fall back to default", in)
 	}
 }
@@ -140,7 +140,7 @@ func TestHeartbeat_StopWaitsForGoroutineToExit(t *testing.T) {
 func TestHeartbeat_StopIsUnblockedWhenEmitterStucks(t *testing.T) {
 	block := make(chan struct{}) // never closed — emitter blocks forever
 	blocker := &blockingMetricEmitter{block: block}
-	hb := NewHeartbeat(time.Millisecond /* fire immediately */, blocker, metrics.MetricSourceAWSMicroVMEnhanced, "")
+	hb := NewHeartbeat(time.Millisecond /* fire immediately */, blocker, metrics.MetricSourceAWSMicroVMEnhanced, nil)
 	hb.Start()
 
 	// Wait until the goroutine is blocked inside AddEnhancedMetric.
@@ -159,7 +159,7 @@ func TestHeartbeat_StopIsUnblockedWhenEmitterStucks(t *testing.T) {
 // Start, so this state should never reach an emitted metric in practice;
 // the test pins the contract anyway in case wiring changes.
 func TestHeartbeat_TagsForEmit_DefaultsMicroVMIDToUnknown(t *testing.T) {
-	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, "test-arn")
+	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, []string{"microvm_image_arn:test-arn"})
 	tags := hb.tagsForEmit()
 	assert.Contains(t, tags, "microvm_image_arn:test-arn")
 	assert.Contains(t, tags, "microvm_id:unknown")
@@ -168,7 +168,7 @@ func TestHeartbeat_TagsForEmit_DefaultsMicroVMIDToUnknown(t *testing.T) {
 // When resourceName is empty the microvm_image_arn tag must be absent — an
 // empty tag value would create a junk time-series in the metrics backend.
 func TestHeartbeat_TagsForEmit_NoARNTagWhenResourceNameEmpty(t *testing.T) {
-	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, "")
+	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, nil)
 	for _, tag := range hb.tagsForEmit() {
 		assert.NotContains(t, tag, "microvm_image_arn",
 			"microvm_image_arn must not appear when resourceName is empty")
@@ -176,7 +176,7 @@ func TestHeartbeat_TagsForEmit_NoARNTagWhenResourceNameEmpty(t *testing.T) {
 }
 
 func TestHeartbeat_SetMicroVMID_ReflectsOnEmittedTags(t *testing.T) {
-	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, "test-arn")
+	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, []string{"microvm_image_arn:test-arn"})
 	hb.SetMicroVMID("mvm-abc123")
 	tags := hb.tagsForEmit()
 	assert.Contains(t, tags, "microvm_image_arn:test-arn")
@@ -189,7 +189,7 @@ func TestHeartbeat_SetMicroVMID_ReflectsOnEmittedTags(t *testing.T) {
 // through correctly; this test closes that gap.
 func TestHeartbeat_EmittedMetric_CarriesARNTag(t *testing.T) {
 	emitter := &mockMetricEmitter{}
-	hb := NewHeartbeat(time.Hour, emitter, metrics.MetricSourceAWSMicroVMEnhanced, "my-image-arn")
+	hb := NewHeartbeat(time.Hour, emitter, metrics.MetricSourceAWSMicroVMEnhanced, []string{"microvm_image_arn:my-image-arn"})
 	hb.Start()
 	defer hb.Stop()
 
@@ -215,7 +215,7 @@ func TestHeartbeat_EmittedMetric_CarriesARNTag(t *testing.T) {
 // header is missing: the heartbeat keeps emitting with whatever ID was
 // last seen (or "unknown" if never set).
 func TestHeartbeat_SetMicroVMID_EmptyIsIgnored(t *testing.T) {
-	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, "")
+	hb := NewHeartbeat(time.Hour, &mockMetricEmitter{}, metrics.MetricSourceAWSMicroVMEnhanced, nil)
 	hb.SetMicroVMID("first-id")
 	hb.SetMicroVMID("")
 	tags := hb.tagsForEmit()
@@ -232,7 +232,7 @@ func TestHeartbeat_SetMicroVMID_OnNilReceiverIsSafe(t *testing.T) {
 // slices so we can assert on what reached AddEnhancedMetric.
 func TestHeartbeat_SetMicroVMID_VisibleOnNextTick(t *testing.T) {
 	emitter := &mockMetricEmitter{}
-	hb := NewHeartbeat(20*time.Millisecond, emitter, metrics.MetricSourceAWSMicroVMEnhanced, "")
+	hb := NewHeartbeat(20*time.Millisecond, emitter, metrics.MetricSourceAWSMicroVMEnhanced, nil)
 	hb.Start()
 	defer hb.Stop()
 
