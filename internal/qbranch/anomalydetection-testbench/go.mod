@@ -11,6 +11,7 @@ require (
 	github.com/DataDog/datadog-agent/comp/core/config v0.77.0-devel.0.20260213154712-e02b9359151a
 	github.com/DataDog/datadog-agent/comp/core/log/def v0.77.0-devel.0.20260213154712-e02b9359151a
 	github.com/DataDog/datadog-agent/comp/core/tagger/def v0.77.0-devel.0.20260213154712-e02b9359151a
+	github.com/DataDog/datadog-agent/pkg/config/model v0.81.0-devel.0.20260603133502-a41610237dba
 	github.com/DataDog/datadog-agent/pkg/util/fxutil v0.81.0-devel.0.20260603133502-a41610237dba
 	github.com/DataDog/datadog-agent/pkg/util/log v0.81.0-devel.0.20260603133502-a41610237dba
 	github.com/DataDog/datadog-agent/pkg/util/option v0.81.0-devel.0.20260603133502-a41610237dba
@@ -53,7 +54,6 @@ require (
 	github.com/DataDog/datadog-agent/pkg/config/env v0.78.1 // indirect
 	github.com/DataDog/datadog-agent/pkg/config/helper v0.78.1 // indirect
 	github.com/DataDog/datadog-agent/pkg/config/mock v0.78.1 // indirect
-	github.com/DataDog/datadog-agent/pkg/config/model v0.78.1 // indirect
 	github.com/DataDog/datadog-agent/pkg/config/nodetreemodel v0.78.1 // indirect
 	github.com/DataDog/datadog-agent/pkg/config/remote v0.59.0-rc.5 // indirect
 	github.com/DataDog/datadog-agent/pkg/config/setup v0.78.1 // indirect
