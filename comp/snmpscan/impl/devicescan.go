@@ -71,8 +71,14 @@ func (s snmpScannerImpl) ScanDeviceAndSendData(ctx context.Context, connParams *
 		snmp.MaxRepetitions = scanParams.BulkMaxRepetitions
 	}
 
+	flushEveryNOIDs := scanParams.FlushEveryNOIDs
+	if flushEveryNOIDs <= 0 {
+		flushEveryNOIDs = metadata.PayloadMetadataBatchSize
+	}
+
 	err = s.runDeviceScan(ctx, snmp, namespace, deviceID, useBulk,
-		scanParams.CallInterval, scanParams.MaxCallCount)
+		scanParams.CallInterval, scanParams.MaxCallCount,
+		flushEveryNOIDs, scanParams.FlushInterval)
 	if err != nil {
 		errs := []error{err}
 
@@ -125,51 +131,80 @@ func (s snmpScannerImpl) runDeviceScan(
 	useBulk bool,
 	callInterval time.Duration,
 	maxCallCount int,
+	flushEveryNOIDs int,
+	flushInterval time.Duration,
 ) error {
-	// execute the scan
-	pdus, err := gatherPDUs(ctx, snmpConnection, useBulk, callInterval, maxCallCount)
-	if err != nil {
-		return err
-	}
+	flusher := newOIDFlusher(deviceNamespace, flushEveryNOIDs, flushInterval, s.sendPayload)
 
-	var deviceOids []*metadata.DeviceOID
-	for _, pdu := range pdus {
-		record, err := metadata.DeviceOIDFromPDU(deviceID, pdu)
-		if err != nil {
-			s.log.Warnf("PDU parsing error: %v", err)
-			continue
-		}
-		deviceOids = append(deviceOids, record)
-	}
-
-	metadataPayloads := metadata.BatchDeviceScan(deviceNamespace, time.Now(), metadata.PayloadMetadataBatchSize, deviceOids)
-	for _, payload := range metadataPayloads {
-		err := s.sendPayload(payload)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// gatherPDUs returns PDUs from the given SNMP device that should cover ever
-// scalar value and at least one row of every table.
-func gatherPDUs(ctx context.Context, snmp *gosnmp.GoSNMP, useBulk bool, callInterval time.Duration, maxCallCount int) ([]*gosnmp.SnmpPDU, error) {
-	var pdus []*gosnmp.SnmpPDU
 	err := gosnmplib.ConditionalWalk(
 		ctx,
-		snmp,
+		snmpConnection,
 		"",
 		useBulk,
 		callInterval,
 		maxCallCount,
 		func(dataUnit gosnmp.SnmpPDU) (string, error) {
-			pdus = append(pdus, &dataUnit)
+			record, err := metadata.DeviceOIDFromPDU(deviceID, &dataUnit)
+			if err != nil {
+				s.log.Warnf("PDU parsing error: %v", err)
+			} else if err := flusher.add(record); err != nil {
+				return "", err
+			}
 			return gosnmplib.SkipOIDRowsNaive(dataUnit.Name), nil
 		})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return pdus, nil
+
+	// Report whatever is left after the walk completes.
+	return flusher.flush()
+}
+
+// oidFlusher accumulates scanned OIDs and reports them as partial scan results
+// once a threshold (count or elapsed time) is reached, so large devices surface
+// results before the whole scan completes.
+type oidFlusher struct {
+	namespace       string
+	flushEveryNOIDs int
+	flushInterval   time.Duration
+	send            func(metadata.NetworkDevicesMetadata) error
+
+	oids      []*metadata.DeviceOID
+	lastFlush time.Time
+}
+
+func newOIDFlusher(namespace string, flushEveryNOIDs int, flushInterval time.Duration, send func(metadata.NetworkDevicesMetadata) error) *oidFlusher {
+	return &oidFlusher{
+		namespace:       namespace,
+		flushEveryNOIDs: flushEveryNOIDs,
+		flushInterval:   flushInterval,
+		send:            send,
+		lastFlush:       time.Now(),
+	}
+}
+
+// add buffers a record and flushes when a threshold is reached.
+func (f *oidFlusher) add(record *metadata.DeviceOID) error {
+	f.oids = append(f.oids, record)
+	if len(f.oids) >= f.flushEveryNOIDs ||
+		(f.flushInterval > 0 && time.Since(f.lastFlush) >= f.flushInterval) {
+		return f.flush()
+	}
+	return nil
+}
+
+// flush reports the buffered OIDs and resets the buffer.
+func (f *oidFlusher) flush() error {
+	if len(f.oids) == 0 {
+		return nil
+	}
+	payloads := metadata.BatchDeviceScan(f.namespace, time.Now(), metadata.PayloadMetadataBatchSize, f.oids)
+	for _, payload := range payloads {
+		if err := f.send(payload); err != nil {
+			return err
+		}
+	}
+	f.oids = nil
+	f.lastFlush = time.Now()
+	return nil
 }
