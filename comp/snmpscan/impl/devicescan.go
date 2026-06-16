@@ -61,7 +61,17 @@ func (s snmpScannerImpl) ScanDeviceAndSendData(ctx context.Context, connParams *
 				snmp.LocalAddr, snmp.Port, errors.Join(errs...)),
 		)
 	}
-	err = s.runDeviceScan(ctx, snmp, namespace, deviceID,
+	// GetBulk is the default walk method, but it does not exist in SNMPv1, so
+	// fall back to GetNext for v1 devices.
+	useBulk := resolveUseBulk(scanParams.ScanMethod, snmp.Version)
+	if !useBulk && scanParams.ScanMethod != snmpscan.ScanMethodGetNext {
+		s.log.Infof("device %s is SNMPv1, falling back to GetNext for the scan", deviceID)
+	}
+	if scanParams.BulkMaxRepetitions > 0 {
+		snmp.MaxRepetitions = scanParams.BulkMaxRepetitions
+	}
+
+	err = s.runDeviceScan(ctx, snmp, namespace, deviceID, useBulk,
 		scanParams.CallInterval, scanParams.MaxCallCount)
 	if err != nil {
 		errs := []error{err}
@@ -97,16 +107,27 @@ func (s snmpScannerImpl) ScanDeviceAndSendData(ctx context.Context, connParams *
 	return nil
 }
 
+// resolveUseBulk returns whether a scan should walk the device with GetBulk.
+// GetBulk is used by default and only disabled when explicitly requesting
+// GetNext or when the device speaks SNMPv1, which has no GetBulk.
+func resolveUseBulk(method snmpscan.ScanMethod, version gosnmp.SnmpVersion) bool {
+	if method == snmpscan.ScanMethodGetNext {
+		return false
+	}
+	return version != gosnmp.Version1
+}
+
 func (s snmpScannerImpl) runDeviceScan(
 	ctx context.Context,
 	snmpConnection *gosnmp.GoSNMP,
 	deviceNamespace string,
 	deviceID string,
+	useBulk bool,
 	callInterval time.Duration,
 	maxCallCount int,
 ) error {
 	// execute the scan
-	pdus, err := gatherPDUs(ctx, snmpConnection, callInterval, maxCallCount)
+	pdus, err := gatherPDUs(ctx, snmpConnection, useBulk, callInterval, maxCallCount)
 	if err != nil {
 		return err
 	}
@@ -134,13 +155,13 @@ func (s snmpScannerImpl) runDeviceScan(
 
 // gatherPDUs returns PDUs from the given SNMP device that should cover ever
 // scalar value and at least one row of every table.
-func gatherPDUs(ctx context.Context, snmp *gosnmp.GoSNMP, callInterval time.Duration, maxCallCount int) ([]*gosnmp.SnmpPDU, error) {
+func gatherPDUs(ctx context.Context, snmp *gosnmp.GoSNMP, useBulk bool, callInterval time.Duration, maxCallCount int) ([]*gosnmp.SnmpPDU, error) {
 	var pdus []*gosnmp.SnmpPDU
 	err := gosnmplib.ConditionalWalk(
 		ctx,
 		snmp,
 		"",
-		false,
+		useBulk,
 		callInterval,
 		maxCallCount,
 		func(dataUnit gosnmp.SnmpPDU) (string, error) {
