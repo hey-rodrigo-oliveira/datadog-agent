@@ -123,6 +123,36 @@ func sortedResolvedTags(low, high []string) []string {
 	return resolved
 }
 
+// resolveResourceFlavorMetadataAsTags is like resolveQueueMetadataAsTags for ResourceFlavor
+// objects (group resource resourceflavors.kueue.x-k8s.io).
+func (r *kueueResourcesMetadataAsTagsResolver) resolveResourceFlavorMetadataAsTags(flavor *workloadmeta.KubernetesKueueResourceFlavor) []string {
+	if r == nil {
+		return nil
+	}
+
+	groupResource := kubernetes.KueueResourceFlavorResourceName + "." + kubernetes.KueueGroupName
+
+	tagList := taglist.NewTagList()
+	for name, value := range flavor.Labels {
+		k8smetadata.AddMetadataAsTags(name, value, r.labelsAsTags[groupResource], r.globLabels[groupResource], tagList)
+	}
+	for name, value := range flavor.Annotations {
+		k8smetadata.AddMetadataAsTags(name, value, r.annotationsAsTags[groupResource], r.globAnnotations[groupResource], tagList)
+	}
+
+	low, _, high, _ := tagList.Compute()
+	if len(low)+len(high) == 0 {
+		return nil
+	}
+
+	resolved := make([]string, 0, len(low)+len(high))
+	resolved = append(resolved, low...)
+	for _, tag := range high {
+		resolved = append(resolved, "+"+tag)
+	}
+	return resolved
+}
+
 func kueueQueueGroupResource(queueType workloadmeta.KueueQueueType) string {
 	switch queueType {
 	case workloadmeta.KueueLocalQueue:
