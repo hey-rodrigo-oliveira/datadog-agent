@@ -255,6 +255,7 @@ func (n *networkDeviceConfigImpl) connectAndEnsureProfile(ctx context.Context, d
 		prof, ok := n.findMatchingProfile(ctx, conn)
 		if !ok {
 			dc.noMatchingProfile = true
+			_ = conn.Close()
 			return nil, fmt.Errorf("no matching NCM profile for device %s", dc.device.DeviceID())
 		}
 		dc.profile = prof
