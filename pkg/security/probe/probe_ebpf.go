@@ -3605,6 +3605,13 @@ func AppendProbeRequestsToFetcher(constantFetcher constantfetch.ConstantFetcher,
 		appendOffsetofRequest(constantFetcher, constantfetch.OffsetNameIoKiocbStructCtx, "struct io_kiocb", "ctx")
 	}
 
+	// IORING_OP_SOCKET (struct io_socket) was added in 5.19
+	if kv.Code != 0 && (kv.Code >= kernel.Kernel5_19) {
+		appendOffsetofRequest(constantFetcher, constantfetch.OffsetNameIoSocketStructDomain, "struct io_socket", "domain")
+		appendOffsetofRequest(constantFetcher, constantfetch.OffsetNameIoSocketStructType, "struct io_socket", "type")
+		appendOffsetofRequest(constantFetcher, constantfetch.OffsetNameIoSocketStructProtocol, "struct io_socket", "protocol")
+	}
+
 	// inode
 	appendOffsetofRequest(constantFetcher, constantfetch.OffsetInodeIno, "struct inode", "i_ino")
 	appendOffsetofRequest(constantFetcher, constantfetch.OffsetInodeMode, "struct inode", "i_mode")

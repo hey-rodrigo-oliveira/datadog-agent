@@ -24,6 +24,18 @@ func getSpliceProbes(fentry bool) []*manager.Probe {
 				EBPFFuncName: "hook_get_pipe_info",
 			},
 		},
+		{
+			ProbeIdentificationPair: manager.ProbeIdentificationPair{
+				UID:          SecurityAgentUID,
+				EBPFFuncName: "hook_io_splice",
+			},
+		},
+		{
+			ProbeIdentificationPair: manager.ProbeIdentificationPair{
+				UID:          SecurityAgentUID,
+				EBPFFuncName: "rethook_io_splice",
+			},
+		},
 	}
 
 	spliceProbes = append(spliceProbes, ExpandSyscallProbes(&manager.Probe{

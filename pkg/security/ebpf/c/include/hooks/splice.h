@@ -6,9 +6,10 @@
 #include "helpers/approvers.h"
 #include "helpers/discarders.h"
 #include "helpers/filesystem.h"
+#include "helpers/iouring.h"
 #include "helpers/syscalls.h"
 
-HOOK_SYSCALL_ENTRY0(splice) {
+int __attribute__((always_inline)) sys_splice(void *ctx, u64 pid_tgid) {
     if (is_discarded_by_pid()) {
         return 0;
     }
@@ -17,10 +18,24 @@ HOOK_SYSCALL_ENTRY0(splice) {
     struct syscall_cache_t syscall = {
         .type = EVENT_SPLICE,
         .policy = policy,
+        .async = pid_tgid ? ASYNC_SYSCALL : SYNC_SYSCALL,
+        .splice = {
+            .pid_tgid = pid_tgid,
+        },
     };
 
     cache_syscall_update_cgroup(ctx, &syscall);
     return 0;
+}
+
+HOOK_SYSCALL_ENTRY0(splice) {
+    return sys_splice(ctx, 0);
+}
+
+HOOK_ENTRY("io_splice")
+int hook_io_splice(ctx_t *ctx) {
+    void *raw_req = (void *)CTX_PARM1(ctx);
+    return sys_splice(ctx, get_pid_tgid_from_iouring(raw_req));
 }
 
 HOOK_ENTRY("get_pipe_info")
@@ -98,13 +113,19 @@ int __attribute__((always_inline)) sys_splice_ret(void *ctx, int retval) {
 
     struct splice_event_t event = {
         .syscall.retval = retval,
+        .event.flags = syscall->async ? EVENT_FLAGS_ASYNC : 0,
         .file = syscall->splice.file,
         .pipe_entry_flag = syscall->splice.pipe_entry_flag,
         .pipe_exit_flag = syscall->splice.pipe_exit_flag,
     };
     fill_file(syscall->splice.dentry, &event.file);
 
-    struct proc_cache_t *entry = fill_process_context(&event.process);
+    struct proc_cache_t *entry;
+    if (syscall->splice.pid_tgid != 0) {
+        entry = fill_process_context_with_pid_tgid(&event.process, syscall->splice.pid_tgid);
+    } else {
+        entry = fill_process_context(&event.process);
+    }
     fill_cgroup_context(entry, &event.cgroup);
     fill_span_context(&event.span);
 
@@ -115,6 +136,11 @@ int __attribute__((always_inline)) sys_splice_ret(void *ctx, int retval) {
 
 HOOK_SYSCALL_EXIT(splice) {
     return sys_splice_ret(ctx, (int)SYSCALL_PARMRET(ctx));
+}
+
+HOOK_EXIT("io_splice")
+int rethook_io_splice(ctx_t *ctx) {
+    return sys_splice_ret(ctx, (int)CTX_PARMRET(ctx));
 }
 
 TAIL_CALL_TRACEPOINT_FNC(handle_sys_splice_exit, struct tracepoint_raw_syscalls_sys_exit_t *args) {

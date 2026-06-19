@@ -127,4 +127,9 @@ const (
 
 	// iouring constants
 	OffsetNameIoKiocbStructCtx = "iokiocb_ctx_offset"
+
+	// iouring io_socket (IORING_OP_SOCKET) command field offsets
+	OffsetNameIoSocketStructDomain   = "io_socket_domain_offset"
+	OffsetNameIoSocketStructType     = "io_socket_type_offset"
+	OffsetNameIoSocketStructProtocol = "io_socket_protocol_offset"
 )
