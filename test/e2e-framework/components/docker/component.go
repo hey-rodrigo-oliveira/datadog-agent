@@ -188,7 +188,7 @@ func (d *Manager) install() (command.Command, error) {
 	// docker succeeds). Debian/Ubuntu keep installing docker.io via Ensure. The el9
 	// repo is reused because RHEL 10 ($releasever=10) is not served by Docker yet.
 	switch d.Host.OS.Descriptor().Flavor {
-	case os.RedHat, os.CentOS, os.RockyLinux:
+	case os.RedHat, os.CentOS, os.RockyLinux, os.AlmaLinux:
 		dockerCEInstall, err := d.Host.OS.Runner().Command(d.namer.ResourceName("docker-ce-install"), &command.Args{
 			Sudo: true,
 			Create: pulumi.String(`bash <<'EOF'
@@ -227,7 +227,7 @@ EOF`),
 	// its nftables firewall backend or the daemon cannot program bridge NAT.
 	daemonOpts := `"storage-driver": "overlay2", "registry-mirrors": ["https://mirror.gcr.io"], "bip": "192.168.16.1/24", "default-address-pools":[{"base":"192.168.32.0/24", "size":24}], "max-download-attempts": 10`
 	switch d.Host.OS.Descriptor().Flavor {
-	case os.RedHat, os.CentOS, os.RockyLinux:
+	case os.RedHat, os.CentOS, os.RockyLinux, os.AlmaLinux:
 		daemonOpts += `, "firewall-backend": "nftables"`
 	}
 	daemonPatch, err := d.Host.OS.Runner().Command(d.namer.ResourceName("daemon-patch"), &command.Args{

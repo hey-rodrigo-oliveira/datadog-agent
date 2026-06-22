@@ -26,6 +26,7 @@ var (
 	AmazonLinuxECS2       = NewDescriptor(AmazonLinuxECS, "2")
 
 	RedHatDefault = RedHat9
+	RedHat8       = NewDescriptor(RedHat, "8")
 	RedHat9       = NewDescriptor(RedHat, "9")
 	RedHat10      = NewDescriptor(RedHat, "10")
 
@@ -37,6 +38,10 @@ var (
 
 	CentOSDefault = CentOS7
 	CentOS7       = NewDescriptor(CentOS, "79")
+
+	// AlmaLinux 9. The AMI is resolved by search (resolveAlmaLinuxAMI), so the
+	// descriptor carries no version; provision it with WithLatestAMI.
+	AlmaLinux9 = NewDescriptor(AlmaLinux, "")
 )
 
 var LinuxDescriptorsDefault = map[Flavor]Descriptor{

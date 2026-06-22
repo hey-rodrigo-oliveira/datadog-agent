@@ -44,7 +44,7 @@ func hostArtifactsClientFactory(sshExecutor *sshExecutor, osFlavor oscomp.Flavor
 					},
 				},
 			}
-		case oscomp.AmazonLinux, oscomp.CentOS, oscomp.RedHat, oscomp.RockyLinux, oscomp.Fedora:
+		case oscomp.AmazonLinux, oscomp.CentOS, oscomp.RedHat, oscomp.RockyLinux, oscomp.Fedora, oscomp.AlmaLinux:
 			return &hostArtifactsClient{
 				cli: &unixAWSCLI{
 					sshExecutor: sshExecutor,

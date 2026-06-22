@@ -65,7 +65,7 @@ func InstallECRCredentialsHelper(n namer.Namer, host *remoteComp.Host, opts ...p
 // their package manager.
 func ensureECRCredentialHelper(n namer.Namer, host *remoteComp.Host, opts ...pulumi.ResourceOption) (command.Command, error) {
 	switch host.OS.Descriptor().Flavor {
-	case os.RedHat, os.CentOS, os.RockyLinux:
+	case os.RedHat, os.CentOS, os.RockyLinux, os.AlmaLinux:
 		// sudo cannot run a bare "if" compound, so feed the script to bash on
 		// stdin (sudo bash <<EOF), matching the kubeadm provisioner's rootScript.
 		install := fmt.Sprintf(`bash <<'EOF'
