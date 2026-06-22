@@ -145,7 +145,7 @@ func newTestCheck(t *testing.T, connectConfig config.ConnectionConfig, instanceC
 	}
 	rawInstanceConfig := []byte(instanceConfig)
 	rawInitConfig := []byte(initConfig)
-	senderManager := mocksender.CreateDefaultDemultiplexer()
+	senderManager := mocksender.CreateDefaultDemultiplexer(t)
 	err = c.Configure(senderManager, integration.FakeConfigHash, rawInstanceConfig, rawInitConfig, "oracle_test", "")
 	if t != nil {
 		require.NoError(t, err)
