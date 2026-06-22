@@ -1569,8 +1569,13 @@ type KueuePodSetAssignment struct {
 type KubernetesKueueWorkload struct {
 	EntityID
 	EntityMeta
-	QueueName         string
-	ClusterQueueName  string
+	QueueName        string
+	ClusterQueueName string
+	// ResolvedTags holds the Workload's label/annotation tags already resolved
+	// against kubernetes_resources_{labels,annotations}_as_tags. Each entry is
+	// in "name:value" form where a leading '+' on the name denotes a
+	// high-cardinality tag (as interpreted by taglist.AddAuto).
+	ResolvedTags      []string
 	PodSetAssignments []KueuePodSetAssignment
 }
 
@@ -1606,6 +1611,9 @@ func (w KubernetesKueueWorkload) String(verbose bool) string {
 	_, _ = fmt.Fprintln(&sb, "Queue:", w.QueueName)
 	_, _ = fmt.Fprintln(&sb, "Cluster Queue:", w.ClusterQueueName)
 	_, _ = fmt.Fprintln(&sb, "Pod Set Assignments:", w.PodSetAssignments)
+	if verbose {
+		_, _ = fmt.Fprintln(&sb, "Resolved Tags:", w.ResolvedTags)
+	}
 	return sb.String()
 }
 

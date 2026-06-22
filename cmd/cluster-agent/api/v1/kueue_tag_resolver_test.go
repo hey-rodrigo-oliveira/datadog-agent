@@ -115,3 +115,34 @@ func TestResolveResourceFlavorMetadataAsTags(t *testing.T) {
 		"flavor:gpu",
 	}, resolver.resolveResourceFlavorMetadataAsTags(flavor))
 }
+
+func TestResolveWorkloadMetadataAsTags(t *testing.T) {
+	cfg := configmock.New(t)
+	cfg.SetInTest("kubernetes_resources_labels_as_tags",
+		`{"workloads.kueue.x-k8s.io": {"team": "team", "owner": "+owner"}}`)
+	cfg.SetInTest("kubernetes_resources_annotations_as_tags",
+		`{"workloads.kueue.x-k8s.io": {"cost-center": "cost_center"}}`)
+
+	resolver := newKueueResourcesMetadataAsTagsResolver(cfg)
+
+	workload := &workloadmeta.KubernetesKueueWorkload{
+		EntityMeta: workloadmeta.EntityMeta{
+			Name:      "job-sample",
+			Namespace: "default",
+			Labels: map[string]string{
+				"team":      "eng",
+				"owner":     "alice",
+				"unrelated": "skip",
+			},
+			Annotations: map[string]string{
+				"cost-center": "1234",
+			},
+		},
+	}
+
+	assert.Equal(t, []string{
+		"+owner:alice",
+		"cost_center:1234",
+		"team:eng",
+	}, resolver.resolveWorkloadMetadataAsTags(workload))
+}

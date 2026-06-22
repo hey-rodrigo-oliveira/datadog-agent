@@ -1750,6 +1750,7 @@ func TestHandleKubeKueueWorkload(t *testing.T) {
 			},
 			QueueName:        "batch",
 			ClusterQueueName: "cluster-batch",
+			ResolvedTags:     []string{"workload_team:ml", "+workload_owner:team-a"},
 			PodSetAssignments: []workloadmeta.KueuePodSetAssignment{
 				{Name: "main", Flavors: map[string]string{"cpu": "default", "nvidia.com/gpu": "a100"}},
 				{Name: "sidecar", Flavors: map[string]string{"cpu": "default"}},
@@ -1760,10 +1761,12 @@ func TestHandleKubeKueueWorkload(t *testing.T) {
 
 	expected := []*types.TagInfo{
 		{
-			Source:       kueueWorkloadSource,
-			EntityID:     types.NewEntityID(types.KueueWorkload, workloadID.ID),
-			IsComplete:   true,
-			HighCardTags: []string{},
+			Source:     kueueWorkloadSource,
+			EntityID:   types.NewEntityID(types.KueueWorkload, workloadID.ID),
+			IsComplete: true,
+			HighCardTags: []string{
+				"workload_owner:team-a",
+			},
 			OrchestratorCardTags: []string{
 				"kueue_workload:job-sample",
 				"kueue_workload_uid:uid-job-sample",
@@ -1776,6 +1779,7 @@ func TestHandleKubeKueueWorkload(t *testing.T) {
 				"kueue_local_queue:batch",
 				"kueue_resource_flavor:a100",
 				"kueue_resource_flavor:default",
+				"workload_team:ml",
 			},
 			StandardTags: []string{},
 		},

@@ -532,8 +532,13 @@ type KueueWorkload struct {
 	Uid               string                   `protobuf:"bytes,7,opt,name=uid,proto3" json:"uid,omitempty"`
 	PodSetAssignments []*KueuePodSetAssignment `protobuf:"bytes,8,rep,name=pod_set_assignments,json=podSetAssignments,proto3" json:"pod_set_assignments,omitempty"`
 	Type              KubeMetadataEventType    `protobuf:"varint,9,opt,name=type,proto3,enum=datadog.kubemetadata.KubeMetadataEventType" json:"type,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// resolved_tags holds the workload's label/annotation tags already resolved by
+	// the cluster agent against kubernetes_resources_{labels,annotations}_as_tags.
+	// Each entry is in "name:value" form where a leading '+' on the name denotes
+	// a high-cardinality tag (as interpreted by taglist.AddAuto).
+	ResolvedTags  []string `protobuf:"bytes,10,rep,name=resolved_tags,json=resolvedTags,proto3" json:"resolved_tags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *KueueWorkload) Reset() {
@@ -627,6 +632,13 @@ func (x *KueueWorkload) GetType() KubeMetadataEventType {
 		return x.Type
 	}
 	return KubeMetadataEventType_SET
+}
+
+func (x *KueueWorkload) GetResolvedTags() []string {
+	if x != nil {
+		return x.ResolvedTags
+	}
+	return nil
 }
 
 type KubeMetadataStreamResponse struct {
@@ -761,7 +773,7 @@ const file_datadog_kubemetadata_kubemetadata_proto_rawDesc = "" +
 	"\aflavors\x18\x02 \x03(\v28.datadog.kubemetadata.KueuePodSetAssignment.FlavorsEntryR\aflavors\x1a:\n" +
 	"\fFlavorsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc8\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xed\x04\n" +
 	"\rKueueWorkload\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -771,7 +783,9 @@ const file_datadog_kubemetadata_kubemetadata_proto_rawDesc = "" +
 	"\vannotations\x18\x06 \x03(\v24.datadog.kubemetadata.KueueWorkload.AnnotationsEntryR\vannotations\x12\x10\n" +
 	"\x03uid\x18\a \x01(\tR\x03uid\x12[\n" +
 	"\x13pod_set_assignments\x18\b \x03(\v2+.datadog.kubemetadata.KueuePodSetAssignmentR\x11podSetAssignments\x12?\n" +
-	"\x04type\x18\t \x01(\x0e2+.datadog.kubemetadata.KubeMetadataEventTypeR\x04type\x1a9\n" +
+	"\x04type\x18\t \x01(\x0e2+.datadog.kubemetadata.KubeMetadataEventTypeR\x04type\x12#\n" +
+	"\rresolved_tags\x18\n" +
+	" \x03(\tR\fresolvedTags\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +

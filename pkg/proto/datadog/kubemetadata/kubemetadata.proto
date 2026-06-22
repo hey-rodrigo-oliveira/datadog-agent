@@ -73,6 +73,11 @@ message KueueWorkload {
   string uid = 7;
   repeated KueuePodSetAssignment pod_set_assignments = 8;
   KubeMetadataEventType type = 9;
+  // resolved_tags holds the workload's label/annotation tags already resolved by
+  // the cluster agent against kubernetes_resources_{labels,annotations}_as_tags.
+  // Each entry is in "name:value" form where a leading '+' on the name denotes
+  // a high-cardinality tag (as interpreted by taglist.AddAuto).
+  repeated string resolved_tags = 10;
 }
 
 message KubeMetadataStreamResponse {

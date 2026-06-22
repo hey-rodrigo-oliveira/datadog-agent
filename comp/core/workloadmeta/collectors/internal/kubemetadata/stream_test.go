@@ -52,6 +52,7 @@ type expectedKueueWorkload struct {
 	clusterQueueName  string
 	labels            map[string]string
 	annotations       map[string]string
+	resolvedTags      []string
 	uid               string
 	podSetAssignments []workloadmeta.KueuePodSetAssignment
 }
@@ -472,6 +473,7 @@ func TestStreamingProvider_handleDCAStreamUpdate(t *testing.T) {
 						ClusterQueue: "cluster-batch",
 						Labels:       map[string]string{"workload": "sample"},
 						Annotations:  map[string]string{"owner": "team-a"},
+						ResolvedTags: []string{"workload:sample", "+owner:team-a"},
 						Uid:          "workload-uid",
 						PodSetAssignments: []*pb.KueuePodSetAssignment{
 							{Name: "main", Flavors: map[string]string{"nvidia.com/gpu": "a100"}},
@@ -562,6 +564,7 @@ func TestStreamingProvider_handleDCAStreamUpdate(t *testing.T) {
 					clusterQueueName: "cluster-batch",
 					labels:           map[string]string{"workload": "sample"},
 					annotations:      map[string]string{"owner": "team-a"},
+					resolvedTags:     []string{"workload:sample", "+owner:team-a"},
 					uid:              "workload-uid",
 					podSetAssignments: []workloadmeta.KueuePodSetAssignment{
 						{Name: "main", Flavors: map[string]string{"nvidia.com/gpu": "a100"}},
@@ -1153,6 +1156,7 @@ func assertKueueWorkloads(t *testing.T, wmetaMock workloadmetamock.Mock, expecte
 		assert.Equal(t, expectedWorkload.clusterQueueName, workload.ClusterQueueName)
 		assert.Equal(t, expectedWorkload.labels, workload.Labels)
 		assert.Equal(t, expectedWorkload.annotations, workload.Annotations)
+		assert.Equal(t, expectedWorkload.resolvedTags, workload.ResolvedTags)
 		assert.Equal(t, expectedWorkload.uid, workload.UID)
 		assert.Equal(t, expectedWorkload.podSetAssignments, workload.PodSetAssignments)
 	}

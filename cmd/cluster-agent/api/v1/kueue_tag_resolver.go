@@ -21,11 +21,11 @@ import (
 )
 
 // kueueResourcesMetadataAsTagsResolver applies kubernetes_resources_{labels,annotations}_as_tags
-// on the cluster agent for Kueue LocalQueues, ClusterQueues, and ResourceFlavors, so only
+// on the cluster agent for Kueue LocalQueues, ClusterQueues, ResourceFlavors, and Workloads, so only
 // the resulting tag strings are streamed to node agents (no raw label/annotation maps).
 //
 // Queue intrinsic tags (kueue_local_queue, kueue_cluster_queue, kube_namespace) and
-// ResourceFlavor node-label / GPU tags are not included here; the node tagger derives those.
+// Workload/ResourceFlavor intrinsic tags are not included here; the node tagger derives those.
 type kueueResourcesMetadataAsTagsResolver struct {
 	labelsAsTags      map[string]map[string]string
 	annotationsAsTags map[string]map[string]string
@@ -70,20 +70,7 @@ func (r *kueueResourcesMetadataAsTagsResolver) resolveQueueMetadataAsTags(queue 
 		return nil
 	}
 
-	tagList := taglist.NewTagList()
-	for name, value := range queue.Labels {
-		k8smetadata.AddMetadataAsTags(name, value, r.labelsAsTags[groupResource], r.globLabels[groupResource], tagList)
-	}
-	for name, value := range queue.Annotations {
-		k8smetadata.AddMetadataAsTags(name, value, r.annotationsAsTags[groupResource], r.globAnnotations[groupResource], tagList)
-	}
-
-	low, _, high, _ := tagList.Compute()
-	if len(low)+len(high) == 0 {
-		return nil
-	}
-
-	return sortedResolvedTags(low, high)
+	return r.resolveMetadataAsTags(groupResource, queue.Labels, queue.Annotations)
 }
 
 // resolveResourceFlavorMetadataAsTags is like resolveQueueMetadataAsTags for ResourceFlavor
@@ -95,11 +82,27 @@ func (r *kueueResourcesMetadataAsTagsResolver) resolveResourceFlavorMetadataAsTa
 
 	groupResource := kubernetes.KueueResourceFlavorResourceName + "." + kubernetes.KueueGroupName
 
+	return r.resolveMetadataAsTags(groupResource, flavor.Labels, flavor.Annotations)
+}
+
+// resolveWorkloadMetadataAsTags is like resolveQueueMetadataAsTags for Workload
+// objects (group resource workloads.kueue.x-k8s.io).
+func (r *kueueResourcesMetadataAsTagsResolver) resolveWorkloadMetadataAsTags(workload *workloadmeta.KubernetesKueueWorkload) []string {
+	if r == nil {
+		return nil
+	}
+
+	groupResource := kubernetes.KueueWorkloadResourceName + "." + kubernetes.KueueGroupName
+
+	return r.resolveMetadataAsTags(groupResource, workload.Labels, workload.Annotations)
+}
+
+func (r *kueueResourcesMetadataAsTagsResolver) resolveMetadataAsTags(groupResource string, labels, annotations map[string]string) []string {
 	tagList := taglist.NewTagList()
-	for name, value := range flavor.Labels {
+	for name, value := range labels {
 		k8smetadata.AddMetadataAsTags(name, value, r.labelsAsTags[groupResource], r.globLabels[groupResource], tagList)
 	}
-	for name, value := range flavor.Annotations {
+	for name, value := range annotations {
 		k8smetadata.AddMetadataAsTags(name, value, r.annotationsAsTags[groupResource], r.globAnnotations[groupResource], tagList)
 	}
 
@@ -120,36 +123,6 @@ func sortedResolvedTags(low, high []string) []string {
 	// taglist.Compute returns map-backed slices; sort to keep stream diff
 	// comparisons stable and avoid spurious metadata updates.
 	slices.Sort(resolved)
-	return resolved
-}
-
-// resolveResourceFlavorMetadataAsTags is like resolveQueueMetadataAsTags for ResourceFlavor
-// objects (group resource resourceflavors.kueue.x-k8s.io).
-func (r *kueueResourcesMetadataAsTagsResolver) resolveResourceFlavorMetadataAsTags(flavor *workloadmeta.KubernetesKueueResourceFlavor) []string {
-	if r == nil {
-		return nil
-	}
-
-	groupResource := kubernetes.KueueResourceFlavorResourceName + "." + kubernetes.KueueGroupName
-
-	tagList := taglist.NewTagList()
-	for name, value := range flavor.Labels {
-		k8smetadata.AddMetadataAsTags(name, value, r.labelsAsTags[groupResource], r.globLabels[groupResource], tagList)
-	}
-	for name, value := range flavor.Annotations {
-		k8smetadata.AddMetadataAsTags(name, value, r.annotationsAsTags[groupResource], r.globAnnotations[groupResource], tagList)
-	}
-
-	low, _, high, _ := tagList.Compute()
-	if len(low)+len(high) == 0 {
-		return nil
-	}
-
-	resolved := make([]string, 0, len(low)+len(high))
-	resolved = append(resolved, low...)
-	for _, tag := range high {
-		resolved = append(resolved, "+"+tag)
-	}
 	return resolved
 }
 

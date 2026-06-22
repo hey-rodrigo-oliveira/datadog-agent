@@ -75,8 +75,7 @@ type kueueWorkloadEntry struct {
 	name              string
 	queueName         string
 	clusterQueueName  string
-	labels            map[string]string
-	annotations       map[string]string
+	resolvedTags      []string
 	uid               string
 	podSetAssignments []kueuePodSetAssignmentEntry
 }
@@ -274,7 +273,7 @@ func (srv *KubeMetadataStreamServer) processWmetaEvents(events []workloadmeta.Ev
 				changed = true
 			}
 		case *workloadmeta.KubernetesKueueWorkload:
-			if srv.metadata.processKueueWorkloadEvent(event.Type, entity) {
+			if srv.metadata.processKueueWorkloadEvent(srv.resolver, event.Type, entity) {
 				changed = true
 			}
 		default:
@@ -354,7 +353,7 @@ func (s *metadataSnapshot) processKueueResourceFlavorEvent(resolver *kueueResour
 	return false
 }
 
-func (s *metadataSnapshot) processKueueWorkloadEvent(eventType workloadmeta.EventType, workload *workloadmeta.KubernetesKueueWorkload) bool {
+func (s *metadataSnapshot) processKueueWorkloadEvent(resolver *kueueResourcesMetadataAsTagsResolver, eventType workloadmeta.EventType, workload *workloadmeta.KubernetesKueueWorkload) bool {
 	key := workload.EntityID.ID
 	switch eventType {
 	case workloadmeta.EventTypeSet:
@@ -363,8 +362,7 @@ func (s *metadataSnapshot) processKueueWorkloadEvent(eventType workloadmeta.Even
 			name:              workload.Name,
 			queueName:         workload.QueueName,
 			clusterQueueName:  workload.ClusterQueueName,
-			labels:            workload.Labels,
-			annotations:       workload.Annotations,
+			resolvedTags:      resolver.resolveWorkloadMetadataAsTags(workload),
 			uid:               workload.UID,
 			podSetAssignments: kueuePodSetAssignmentEntries(workload.PodSetAssignments),
 		}
@@ -696,11 +694,10 @@ func protoKueueWorkload(entry kueueWorkloadEntry, eventType pb.KubeMetadataEvent
 		Name:              entry.name,
 		Queue:             entry.queueName,
 		ClusterQueue:      entry.clusterQueueName,
-		Labels:            entry.labels,
-		Annotations:       entry.annotations,
 		Uid:               entry.uid,
 		PodSetAssignments: protoKueuePodSetAssignments(entry.podSetAssignments),
 		Type:              eventType,
+		ResolvedTags:      entry.resolvedTags,
 	}
 }
 
@@ -741,8 +738,7 @@ func kueueWorkloadEqual(left, right kueueWorkloadEntry) bool {
 		left.queueName == right.queueName &&
 		left.clusterQueueName == right.clusterQueueName &&
 		left.uid == right.uid &&
-		maps.Equal(left.labels, right.labels) &&
-		maps.Equal(left.annotations, right.annotations) &&
+		slices.Equal(left.resolvedTags, right.resolvedTags) &&
 		kueuePodSetAssignmentsEqual(left.podSetAssignments, right.podSetAssignments)
 }
 
