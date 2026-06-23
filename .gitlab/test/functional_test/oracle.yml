@@ -12,14 +12,16 @@ oracle:
       name: "registry.ddbuild.io/images/mirror/oracle:${DBMS_VERSION}"
       variables:
         ORACLE_PWD: "datad0g"
+        HEALTHCHECK_TCP_PORT: "1521"
   variables:
     CI_DEBUG_SERVICES: "true"
     DD_HOSTNAME: "oracle-test"
-    # Configure static CPUs
-    KUBERNETES_POD_ANNOTATIONS_1: "ci.ddbuild.io/enforce-static-cpus=true"
-    KUBERNETES_CPU_LIMIT: "3"
+    # No static CPU pinning: the build container and the Oracle service
+    # peak at different times (DB OPEN happens before the Go tests run),
+    # so CFS scheduling lets the DB borrow the build container's idle
+    # cycles during startup instead of starving in a leftover pool.
     KUBERNETES_MEMORY_LIMIT: "6Gi"
-    KUBERNETES_SERVICE_CPU_REQUEST: "1"
+    KUBERNETES_SERVICE_CPU_REQUEST: "2"
     KUBERNETES_SERVICE_MEMORY_LIMIT: "6Gi"
   parallel:
     matrix:
@@ -27,4 +29,4 @@ oracle:
   before_script:
     - !reference [.retrieve_linux_go_deps]
   script:
-    - dda inv -- oracle.test
+    - dda inv -- oracle.test --verbose

@@ -8,11 +8,14 @@
 package oracle
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,15 +53,41 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	print("Running initdb.d sql files...")
+	fmt.Println("Running initdb.d sql files...")
 	// This is a bit of a hack to get a db connection without a testing.T
 	// Ideally we should pull the connection logic out
 	// to make it more accessible for testing
 	sysCheck, _ := newSysCheck(nil, "", "")
-	sysCheck.Run()
-	_, err := sysCheck.db.Exec("SELECT 1 FROM dual")
-	if err != nil {
-		fmt.Printf("Error executing select check: %s\n", err)
+	defer sysCheck.Teardown()
+	// Oracle XE needs time to register its service with the
+	// listener after startup; retry on connection errors.
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxInterval = 30 * time.Second
+	outerCtx, outerCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer outerCancel()
+	if _, err := backoff.Retry(outerCtx, func() (struct{}, error) {
+		runErr := sysCheck.Run()
+		if runErr != nil {
+			fmt.Fprintf(os.Stderr, "oracle check: %s\n", runErr)
+			if !isConnectionError(runErr) {
+				return struct{}{}, backoff.Permanent(runErr)
+			}
+			return struct{}{}, runErr
+		}
+		// Run() can return nil while skipping checks due to collection
+		// intervals; verify the connection is actually usable.
+		_, pingErr := sysCheck.db.Exec("SELECT 1 FROM dual")
+		if pingErr != nil {
+			fmt.Fprintf(os.Stderr, "SELECT 1 FROM dual: %s\n", pingErr)
+		}
+		if pingErr != nil && !isConnectionError(pingErr) {
+			return struct{}{}, backoff.Permanent(pingErr)
+		}
+		return struct{}{}, pingErr
+	}, backoff.WithBackOff(bo), backoff.WithNotify(func(err error, d time.Duration) {
+		fmt.Fprintf(os.Stderr, "Oracle not ready (%s), retrying in %s\n", err, d)
+	})); err != nil {
+		fmt.Fprintf(os.Stderr, "Error running oracle sys check: %s\n", err)
 		os.Exit(1)
 	}
 
