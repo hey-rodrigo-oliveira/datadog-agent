@@ -185,6 +185,59 @@ func TestIngestMetricSyncDropsNormalizedAgentMetrics(t *testing.T) {
 	assert.Empty(t, agentSeries)
 }
 
+func TestAgentMetricsUseDedicatedNamespace(t *testing.T) {
+	storage := newTimeSeriesStorage()
+	eng := newEngine(engineConfig{storage: storage})
+
+	obs := &observerImpl{
+		engine:               eng,
+		obsCh:                make(chan observation, 16),
+		ingestMetricsEnabled: true,
+	}
+	obs.handleFunc = obs.innerHandle
+
+	var (
+		wg        sync.WaitGroup
+		closeOnce sync.Once
+	)
+	stopFn := func() {
+		closeOnce.Do(func() { close(obs.obsCh) })
+		wg.Wait()
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		obs.run()
+	}()
+	t.Cleanup(stopFn)
+
+	h := obs.GetHandle("dogstatsd")
+	h.ObserveMetric(&metricObs{
+		name:      "system.cpu.user",
+		value:     50,
+		timestamp: 1000,
+	})
+	h.ObserveMetric(&metricObs{
+		name:      "datadog.agent.running",
+		value:     1,
+		timestamp: 1000,
+	})
+
+	stopFn()
+
+	dogstatsdSeries := storage.ListSeries(observerdef.SeriesFilter{Namespace: "dogstatsd"})
+	require.Len(t, dogstatsdSeries, 1)
+	assert.Equal(t, "system.cpu.user", dogstatsdSeries[0].Name)
+
+	agentSeries := storage.ListSeries(observerdef.SeriesFilter{Namespace: observerdef.AgentNamespace})
+	require.Len(t, agentSeries, 1)
+	assert.Equal(t, "datadog.agent.running", agentSeries[0].Name)
+
+	workloadSeries := storage.ListSeries(observerdef.WorkloadSeriesFilter())
+	require.Len(t, workloadSeries, 1)
+	assert.Equal(t, "dogstatsd", workloadSeries[0].Namespace)
+}
+
 // TestMetricDropHandle covers the metricDropHandle wrapper in isolation.
 func TestMetricDropHandle(t *testing.T) {
 	inner := &countingHandle{}
