@@ -9,9 +9,9 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"sync/atomic"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -63,7 +63,7 @@ func TestMicroVMGetTags(t *testing.T) {
 	assert.Equal(t, "my-image", tags["image_name"])
 	assert.Equal(t, MicroVMOrigin, tags["origin"])
 	assert.Equal(t, MicroVMOrigin, tags["_dd.origin"])
-	assert.Equal(t, "lambda_microvm", tags["resource_type"])
+	assert.Equal(t, "lambdamicrovm", tags["resource_type"])
 	assert.Equal(t, "aws", tags["resource_provider"])
 	assert.Equal(t, testImageARN, tags["resource_id"])
 	assert.NotContains(t, tags, "microvm_image_arn")
@@ -76,7 +76,7 @@ func TestMicroVMGetTagsMissingARN(t *testing.T) {
 	assert.Equal(t, "unknown", tags["account_id"])
 	assert.Equal(t, "unknown", tags["image_name"])
 	assert.Equal(t, "unknown", tags["resource_id"])
-	assert.Equal(t, "lambda_microvm", tags["resource_type"])
+	assert.Equal(t, "lambdamicrovm", tags["resource_type"])
 	assert.Equal(t, "aws", tags["resource_provider"])
 }
 
@@ -89,7 +89,7 @@ func TestMicroVMGetEnhancedMetricTags(t *testing.T) {
 	assert.Equal(t, "us-east-1", result.Base["region"])
 	assert.Equal(t, "123456789012", result.Base["account_id"])
 	assert.Equal(t, "my-image", result.Base["image_name"])
-	assert.Equal(t, "lambda_microvm", result.Base["resource_type"])
+	assert.Equal(t, "lambdamicrovm", result.Base["resource_type"])
 	assert.Equal(t, "aws", result.Base["resource_provider"])
 	assert.Equal(t, testImageARN, result.Base["resource_id"])
 	assert.NotContains(t, result.Base, "instance_id", "Base must not carry the high-cardinality instance_id")
@@ -99,7 +99,7 @@ func TestMicroVMGetEnhancedMetricTags(t *testing.T) {
 	assert.Equal(t, result.Base["resource_type"], result.Usage["resource_type"])
 	assert.Equal(t, result.Base["resource_provider"], result.Usage["resource_provider"])
 	assert.Equal(t, result.Base["resource_id"], result.Usage["resource_id"])
-	assert.NotContains(t, result.Usage, "instance_id", "instance_id is absent until SetInstanceID is called from /launch")
+	assert.NotContains(t, result.Usage, "instance_id", "instance_id is absent until SetInstanceID is called from /run")
 }
 
 func TestMicroVMGetEnhancedMetricTagsMissingARN(t *testing.T) {
@@ -110,7 +110,7 @@ func TestMicroVMGetEnhancedMetricTagsMissingARN(t *testing.T) {
 	assert.Equal(t, "unknown", result.Base["region"])
 	assert.Equal(t, "unknown", result.Base["account_id"])
 	assert.Equal(t, "unknown", result.Base["resource_id"])
-	assert.Equal(t, "lambda_microvm", result.Base["resource_type"])
+	assert.Equal(t, "lambdamicrovm", result.Base["resource_type"])
 	assert.Equal(t, "aws", result.Base["resource_provider"])
 	assert.Equal(t, result.Base["resource_id"], result.Usage["resource_id"])
 }
@@ -173,14 +173,14 @@ func TestLifecycleContext_NilLogsTagSetter_IsAccepted(t *testing.T) {
 	assert.Nil(t, lc.LogsTagSetter, "nil LogsTagSetter must be accepted by LifecycleContext")
 }
 
-// TestMicroVM_LogsTagSetter_InvokedOnLaunch verifies the behaviour that
+// TestMicroVM_LogsTagSetter_InvokedOnRun verifies the behaviour that
 // MicroVM.Init wires when LogsTagSetter is non-nil: SetLogsTagSetter is called
-// on the server, and the server then invokes the setter on /launch with the
+// on the server, and the server then invokes the setter on /run with the
 // base tags plus the microvm_id from the request body.
 //
 // The test constructs the server directly with port 0 (random free port) to
 // avoid the log.Fatalf that Init emits when port 9000 is already bound.
-func TestMicroVM_LogsTagSetter_InvokedOnLaunch(t *testing.T) {
+func TestMicroVM_LogsTagSetter_InvokedOnRun(t *testing.T) {
 	metricAgent := &serverlessMetrics.ServerlessMetricAgent{}
 
 	var mu sync.Mutex
@@ -216,9 +216,9 @@ func TestMicroVM_LogsTagSetter_InvokedOnLaunch(t *testing.T) {
 		_ = srv.Stop(shutCtx)
 	})
 
-	launchPath := "/aws/lambda-microvms/runtime/beta/v1/launch"
-	body := strings.NewReader(`{"microVmId":"vm-abc123"}`)
-	resp, err := http.Post("http://"+l.Addr().String()+launchPath, "application/json", body)
+	runPath := "/aws/lambda-microvms/runtime/v1/run"
+	body := strings.NewReader(`{"microvmId":"vm-abc123"}`)
+	resp, err := http.Post("http://"+l.Addr().String()+runPath, "application/json", body)
 	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
 
@@ -226,9 +226,9 @@ func TestMicroVM_LogsTagSetter_InvokedOnLaunch(t *testing.T) {
 	got := receivedTags
 	mu.Unlock()
 
-	assert.Contains(t, got, "env:test", "base tags must be forwarded to LogsTagSetter on /launch")
-	assert.Contains(t, got, "service:myapp", "base tags must be forwarded to LogsTagSetter on /launch")
-	assert.Contains(t, got, "lambda_microvm_id:vm-abc123", "microvm_id from /launch body must be appended to tags")
+	assert.Contains(t, got, "env:test", "base tags must be forwarded to LogsTagSetter on /run")
+	assert.Contains(t, got, "service:myapp", "base tags must be forwarded to LogsTagSetter on /run")
+	assert.Contains(t, got, "lambda_microvm_id:vm-abc123", "microvm_id from /run body must be appended to tags")
 }
 
 // TestLifecycleContext_NilTraceTagSetter_IsAccepted verifies that
@@ -239,12 +239,12 @@ func TestLifecycleContext_NilTraceTagSetter_IsAccepted(t *testing.T) {
 	assert.Nil(t, lc.TraceTagSetter, "nil TraceTagSetter must be accepted by LifecycleContext")
 }
 
-// TestMicroVM_TraceTagSetter_InvokedOnLaunch verifies the end-to-end wiring of
+// TestMicroVM_TraceTagSetter_InvokedOnRun verifies the end-to-end wiring of
 // TraceTagSetter: MicroVM.Init passes it to the server, and the server calls it
-// on /launch with base trace tags extended by lambda_microvm_id from the body.
+// on /run with base trace tags extended by lambda_microvm_id from the body.
 //
-// Mirrors TestMicroVM_LogsTagSetter_InvokedOnLaunch.
-func TestMicroVM_TraceTagSetter_InvokedOnLaunch(t *testing.T) {
+// Mirrors TestMicroVM_LogsTagSetter_InvokedOnRun.
+func TestMicroVM_TraceTagSetter_InvokedOnRun(t *testing.T) {
 	metricAgent := &serverlessMetrics.ServerlessMetricAgent{}
 
 	var mu sync.Mutex
@@ -278,9 +278,9 @@ func TestMicroVM_TraceTagSetter_InvokedOnLaunch(t *testing.T) {
 		_ = srv.Stop(shutCtx)
 	})
 
-	launchPath := "/aws/lambda-microvms/runtime/beta/v1/launch"
-	body := strings.NewReader(`{"microVmId":"vm-abc123"}`)
-	resp, err := http.Post("http://"+l.Addr().String()+launchPath, "application/json", body)
+	runPath := "/aws/lambda-microvms/runtime/v1/run"
+	body := strings.NewReader(`{"microvmId":"vm-abc123"}`)
+	resp, err := http.Post("http://"+l.Addr().String()+runPath, "application/json", body)
 	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
 
@@ -288,9 +288,9 @@ func TestMicroVM_TraceTagSetter_InvokedOnLaunch(t *testing.T) {
 	got := receivedTags
 	mu.Unlock()
 
-	assert.Equal(t, "test", got["env"], "base trace tags must be forwarded to TraceTagSetter on /launch")
-	assert.Equal(t, "myapp", got["service"], "base trace tags must be forwarded to TraceTagSetter on /launch")
-	assert.Equal(t, "vm-abc123", got["lambda_microvm_id"], "microvm_id from /launch body must appear in trace tags")
+	assert.Equal(t, "test", got["env"], "base trace tags must be forwarded to TraceTagSetter on /run")
+	assert.Equal(t, "myapp", got["service"], "base trace tags must be forwarded to TraceTagSetter on /run")
+	assert.Equal(t, "vm-abc123", got["lambda_microvm_id"], "microvm_id from /run body must appear in trace tags")
 }
 
 func TestMicroVMInit_NilTracingCtx_DoesNotStartServer(t *testing.T) {
