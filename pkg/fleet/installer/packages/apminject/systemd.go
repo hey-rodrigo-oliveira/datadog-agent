@@ -53,7 +53,8 @@ type SystemdServiceManager struct {
 // subcommands the unit invokes. The resolved path is baked into the unit's
 // ExecStart/ExecStop. installerPath is "" when no supported installer is found
 // (no candidate on disk, or only older ones); callers must then skip rendering
-// the unit and fall back to direct ld.so.preload management.
+// the unit and fall back to direct ld.so.preload management (see
+// setupSystemdPreloadUnit), since the candidate set is not guaranteed in practice.
 func NewSystemdServiceManager() *SystemdServiceManager {
 	installerPath, err := resolveInstallerPath(installerPathCandidates, supportsInstrumentSubcommands)
 	if err != nil {
@@ -100,11 +101,9 @@ func supportsInstrumentSubcommands(path string) bool {
 	return supported
 }
 
-// Setup writes the embedded service file and enables it for future boots.
-// It also attempts to start the service immediately, but a start failure is
-// non-fatal: the service is still enabled and will start on the next boot.
-// The caller is expected to call InstrumentLDPreload directly to cover the
-// current boot in case the service did not start.
+// Setup writes the embedded service file, enables it for future boots, and
+// starts it immediately. Returns an error if any step fails, including the
+// immediate start: a unit that cannot start is removed by the caller.
 func (s *SystemdServiceManager) Setup(ctx context.Context) (err error) {
 	span, ctx := telemetry.StartSpanFromContext(ctx, "systemd_service_setup")
 	defer func() { span.Finish(err) }()
@@ -124,13 +123,9 @@ func (s *SystemdServiceManager) Setup(ctx context.Context) (err error) {
 	}
 
 	if err := systemd.StartUnit(ctx, s.serviceName); err != nil {
-		// Non-fatal: the service is enabled and will start on next boot.
-		// The caller will fall back to direct ld.so.preload instrumentation
-		// for the current boot.
-		log.Warnf("APM inject service failed to start immediately (will start on next boot): %v", err)
-	} else {
-		log.Infof("APM injector systemd service installed, enabled, and started")
+		return fmt.Errorf("failed to start systemd service: %w", err)
 	}
+	log.Infof("APM injector systemd service installed, enabled, and started")
 	return nil
 }
 

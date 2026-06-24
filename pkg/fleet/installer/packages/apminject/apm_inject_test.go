@@ -102,6 +102,44 @@ func TestRemoveLDPreloadConfig(t *testing.T) {
 
 }
 
+func TestSetLDPreloadConfig_TmpfsMigratesPersistentPath(t *testing.T) {
+	// When the active entry is the tmpfs symlink path, a stale persistent OCI
+	// entry must be migrated in place (not left behind, which would re-create
+	// the reboot hazard).
+	a := &InjectorInstaller{
+		installPath:    "/opt/datadog-packages/datadog-apm-inject/stable",
+		tmpfsInjectDir: "/run/datadog-apm-inject",
+		launcherPath:   "/run/datadog-apm-inject/launcher.preload.so",
+	}
+
+	out, err := a.setLDPreloadConfigContent(context.TODO(),
+		[]byte("/opt/datadog-packages/datadog-apm-inject/stable/inject/launcher.preload.so\n"))
+	require.NoError(t, err)
+	assert.Equal(t, "/run/datadog-apm-inject/launcher.preload.so\n", string(out))
+
+	// Idempotent: the tmpfs entry already present returns unchanged.
+	out, err = a.setLDPreloadConfigContent(context.TODO(), out)
+	require.NoError(t, err)
+	assert.Equal(t, "/run/datadog-apm-inject/launcher.preload.so\n", string(out))
+}
+
+func TestRemoveLDPreloadConfig_TmpfsPath(t *testing.T) {
+	a := &InjectorInstaller{
+		installPath:    "/opt/datadog-packages/datadog-apm-inject/stable",
+		tmpfsInjectDir: "/run/datadog-apm-inject",
+	}
+	for input, expected := range map[string]string{
+		"/run/datadog-apm-inject/launcher.preload.so\n":                              "",
+		"/abc/def/preload.so\n/run/datadog-apm-inject/launcher.preload.so\n":         "/abc/def/preload.so\n",
+		"/run/datadog-apm-inject/$lib/launcher.preload.so":                           "",
+		"/opt/datadog-packages/datadog-apm-inject/stable/inject/launcher.preload.so": "",
+	} {
+		output, err := a.deleteLDPreloadConfigContent(context.TODO(), []byte(input))
+		assert.NoError(t, err)
+		assert.Equal(t, expected, string(output))
+	}
+}
+
 func TestShouldInstrumentHost(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -145,7 +183,7 @@ func TestInstrumentLDPreload_MissingLibrary(t *testing.T) {
 
 	a := newInstallerWithPaths(tmpDir, preloadFile)
 
-	err := a.InstrumentLDPreload(context.TODO())
+	err := a.InstrumentLDPreload(context.TODO(), ViaPersistentPath)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "launcher library not found")
 
