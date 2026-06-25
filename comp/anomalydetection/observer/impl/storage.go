@@ -284,7 +284,14 @@ func (s *timeSeriesStorage) Add(namespace, name string, value float64, timestamp
 		return AddResult{Ref: -1}
 	}
 	h := seriesKeyHash(namespace, name, tags)
-	canonTags := canonicalizeTags(tags)
+	// Skip the alloc when tags are already sorted (e.g. from prepareMetricIngest).
+	// The guard is load-bearing for the virtual-metric path which may pass unsorted tags.
+	var canonTags []string
+	if tagsSorted(tags) {
+		canonTags = tags
+	} else {
+		canonTags = canonicalizeTags(tags)
+	}
 
 	stats, exists := s.series[h]
 	// Collision guard: verify full identity (namespace + name + sorted tags).
