@@ -50,14 +50,14 @@ namespace Datadog.CustomActions
                 }
             }
 
-            TryRemoveEmptyProcessesD(session, projectLocation);
+            TryRemoveProcessesDOnUninstall(session, projectLocation);
 
             return ActionResult.Success;
         }
 
-        private static void TryRemoveEmptyProcessesD(ISession session, string projectLocation)
+        private static void TryRemoveProcessesDOnUninstall(ISession session, string projectLocation)
         {
-            if (session.Property("RemoveEmptyProcessesD") != "1")
+            if (session.Property("CleanupProcessesDOnUninstall") != "1")
             {
                 return;
             }
@@ -70,18 +70,12 @@ namespace Datadog.CustomActions
                     return;
                 }
 
-                if (Directory.EnumerateFileSystemEntries(processesDir).Any())
-                {
-                    session.Log($"{processesDir} is not empty, skip deletion.");
-                    return;
-                }
-
-                session.Log($"Deleting empty directory \"{processesDir}\"");
-                Directory.Delete(processesDir);
+                session.Log($"Deleting directory \"{processesDir}\"");
+                Directory.Delete(processesDir, true);
             }
             catch (Exception e)
             {
-                session.Log($"Error while deleting empty processes.d directory: {e}");
+                session.Log($"Error while deleting processes.d directory: {e}");
             }
         }
 
