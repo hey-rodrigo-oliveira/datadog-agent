@@ -30,5 +30,5 @@ func restartEnabled() bool {
 }
 
 func restart() error {
-	return exec.Command("/bin/launchctl", "kickstart", "-k", "system/com.datadoghq.agent").Start()
+	return exec.Command("/bin/launchctl", "kickstart", "-k", "system/com.datadoghq.agent").Run()
 }
