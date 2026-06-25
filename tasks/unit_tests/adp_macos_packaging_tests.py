@@ -16,11 +16,15 @@ class TestADPMacOSPackaging(unittest.TestCase):
         self.assertIn("AGENT_DATA_PLANE_SOURCE_URL_BASE", recipe)
         self.assertIn('package_target = "darwin-#{target_arch}"', recipe)
         self.assertIn("Agent Data Plane FIPS artifacts are not available for macOS", recipe)
+        self.assertIn('package_target = "fips-#{package_target}" if fips_mode?', recipe)
+        self.assertIn("AGENT_DATA_PLANE_HASH_WINDOWS_AMD64", recipe)
+        self.assertIn("AGENT_DATA_PLANE_HASH_FIPS_WINDOWS_AMD64", recipe)
+        self.assertIn('package_extension = "zip"', recipe)
 
-    def test_adp_dependency_is_included_on_linux_and_macos(self):
+    def test_adp_dependency_is_included_on_linux_macos_and_windows(self):
         dependencies = (REPO_ROOT / "omnibus/config/software/datadog-agent-dependencies.rb").read_text()
 
-        self.assertIn("(linux_target? || osx_target?) && !heroku_target?", dependencies)
+        self.assertIn("(linux_target? || osx_target? || windows_target?) && !heroku_target?", dependencies)
 
     def test_darwin_adp_hashes_and_url_base_are_forwarded_to_omnibus(self):
         darwin_env = OS_SPECIFIC_ENV_PASSTHROUGH["darwin"]

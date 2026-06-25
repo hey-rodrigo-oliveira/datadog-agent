@@ -55,11 +55,7 @@ elsif windows_target?
     raise "Agent Data Plane Windows artifacts are only available for amd64."
   end
   package_target = "windows-#{target_arch}"
-  adp_hash_key = package_target
-  if fips_mode?
-    package_target = "#{package_target}-fips"
-    adp_hash_key = "fips-windows-#{target_arch}"
-  end
+  package_target = "fips-#{package_target}" if fips_mode?
   package_extension = "zip"
 else
   raise "Agent Data Plane is only packaged for Linux, macOS, and Windows."
