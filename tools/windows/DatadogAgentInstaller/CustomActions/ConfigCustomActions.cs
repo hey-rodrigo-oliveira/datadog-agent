@@ -9,7 +9,6 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
-using Microsoft.Win32;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -21,7 +20,6 @@ namespace Datadog.CustomActions
         private const string AiUsageNativeHostName = "com.datadoghq.ai_prompt_logger.native_host";
         private const string ADPInstallRootPlaceholder = "__ADP_INSTALL_ROOT__";
         private const string ADPEtcRootPlaceholder = "__ADP_ETC_ROOT__";
-        private const string ADPFleetPoliciesDirPlaceholder = "__ADP_FLEET_POLICIES_DIR__";
         private const string ADPWindowsProcmgrConfigResource = "Datadog.CustomActions.Resources.datadog-agent-data-plane.yaml";
 
         /// <summary>
@@ -477,29 +475,6 @@ namespace Datadog.CustomActions
 
         private static string NormalizePathForYaml(string path) => path.Replace('\\', '/');
 
-        private static string FleetPoliciesDirForManagedProcess(string configFolder)
-        {
-            try
-            {
-                using var key = Registry.LocalMachine.OpenSubKey(Constants.DatadogAgentRegistryKey);
-                if (key?.GetValue("fleet_policies_dir") is string registryValue && !string.IsNullOrEmpty(registryValue))
-                {
-                    return NormalizePathForYaml(registryValue);
-                }
-            }
-            catch
-            {
-                // fall through to the stable managed default
-            }
-
-            return NormalizePathForYaml(Path.Combine(
-                configFolder,
-                "Installer",
-                "managed",
-                "datadog-agent",
-                "stable"));
-        }
-
         private static string LoadADPWindowsProcmgrConfigTemplate()
         {
             using var stream = typeof(ConfigCustomActions).Assembly.GetManifestResourceStream(ADPWindowsProcmgrConfigResource);
@@ -520,12 +495,10 @@ namespace Datadog.CustomActions
             var adpProcmgrConfigPath = Path.Combine(adpProcmgrDir, "datadog-agent-data-plane.yaml");
             var installRoot = NormalizePathForYaml(projectLocation);
             var etcRoot = NormalizePathForYaml(configFolder);
-            var fleetPoliciesDir = FleetPoliciesDirForManagedProcess(configFolder);
 
             var adpProcmgrConfig = LoadADPWindowsProcmgrConfigTemplate()
                 .Replace(ADPInstallRootPlaceholder, installRoot)
-                .Replace(ADPEtcRootPlaceholder, etcRoot)
-                .Replace(ADPFleetPoliciesDirPlaceholder, fleetPoliciesDir);
+                .Replace(ADPEtcRootPlaceholder, etcRoot);
             File.WriteAllText(adpProcmgrConfigPath, adpProcmgrConfig);
         }
 

@@ -220,10 +220,9 @@ var (
 		Stable:           true,
 	}
 	windowsADPCodegenData = installerTemplateData{
-		InstallDir:       "__ADP_INSTALL_ROOT__",
-		EtcDir:           "__ADP_ETC_ROOT__",
-		FleetPoliciesDir: "__ADP_FLEET_POLICIES_DIR__",
-		Stable:           true,
+		InstallDir: "__ADP_INSTALL_ROOT__",
+		EtcDir:     "__ADP_ETC_ROOT__",
+		Stable:     true,
 	}
 	windowsProcmgrLayouts = []embeddedLayout{
 		{subdir: "windows", units: windowsProcmgrYAMLFiles(windowsDDOTCodegenData, windowsADPCodegenData)},
