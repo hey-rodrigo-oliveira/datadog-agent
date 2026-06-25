@@ -1685,11 +1685,11 @@ func TestSanitizeDataPlaneConfig(t *testing.T) {
 			wantSource:   pkgconfigmodel.SourceFile,
 		},
 		{
-			name:         "windows resets true to false",
+			name:         "windows preserves true",
 			goos:         "windows",
 			initialValue: true,
-			wantValue:    false,
-			wantSource:   pkgconfigmodel.SourceAgentRuntime,
+			wantValue:    true,
+			wantSource:   pkgconfigmodel.SourceFile,
 		},
 		{
 			name:         "darwin preserves true",
@@ -1699,11 +1699,25 @@ func TestSanitizeDataPlaneConfig(t *testing.T) {
 			wantSource:   pkgconfigmodel.SourceFile,
 		},
 		{
-			// Even when already false, non-Linux writes SourceAgentRuntime so that
-			// lower-priority sources (e.g. fleet policies) cannot re-enable ADP later.
-			name:         "windows locks false via SourceAgentRuntime",
+			name:         "windows preserves false",
 			goos:         "windows",
 			initialValue: false,
+			wantValue:    false,
+			wantSource:   pkgconfigmodel.SourceFile,
+		},
+		{
+			// Even when already false, unsupported platforms write SourceAgentRuntime so that
+			// lower-priority sources (e.g. fleet policies) cannot re-enable ADP later.
+			name:         "freebsd locks false via SourceAgentRuntime",
+			goos:         "freebsd",
+			initialValue: false,
+			wantValue:    false,
+			wantSource:   pkgconfigmodel.SourceAgentRuntime,
+		},
+		{
+			name:         "freebsd resets true to false",
+			goos:         "freebsd",
+			initialValue: true,
 			wantValue:    false,
 			wantSource:   pkgconfigmodel.SourceAgentRuntime,
 		},

@@ -107,6 +107,18 @@ func subservices(coreConf model.Reader, sysprobeConf model.Reader) []Servicedef 
 			shouldShutdown: true, // NOTE: not really ncessary with SCM dependency in place
 		},
 		{
+			name: "data-plane",
+			configKeys: map[string]model.Reader{
+				"data_plane.enabled": coreConf,
+			},
+			suppressIf: func() bool {
+				return adpProcmgrProcessDefinitionExists() && coreConf.GetBool("process_manager.enabled")
+			},
+			serviceName:    "datadog-agent-data-plane",
+			serviceInit:    dataPlaneInit,
+			shouldShutdown: true,
+		},
+		{
 			name: "procmgr",
 			configKeys: map[string]model.Reader{
 				"process_manager.enabled": coreConf,
@@ -139,6 +151,10 @@ func installerInit() error {
 }
 
 func otelInit() error {
+	return nil
+}
+
+func dataPlaneInit() error {
 	return nil
 }
 
@@ -243,6 +259,20 @@ func ddotProcmgrProcessDefinitionExists() bool {
 		return false
 	}
 	p := filepath.Join(installPath, "processes.d", ddotProcmgrProcessDefinitionFile)
+	st, err := os.Stat(p)
+	return err == nil && !st.IsDir()
+}
+
+const adpProcmgrProcessDefinitionFile = "datadog-agent-data-plane.yaml"
+
+// True if the ADP processes.d definition exists (dd-procmgr supervises ADP). With
+// process_manager.enabled, the Agent skips starting the datadog-agent-data-plane Windows service.
+func adpProcmgrProcessDefinitionExists() bool {
+	installPath, err := winutil.GetProgramFilesDirForProduct("Datadog Agent")
+	if err != nil || installPath == "" {
+		return false
+	}
+	p := filepath.Join(installPath, "processes.d", adpProcmgrProcessDefinitionFile)
 	st, err := os.Stat(p)
 	return err == nil && !st.IsDir()
 }

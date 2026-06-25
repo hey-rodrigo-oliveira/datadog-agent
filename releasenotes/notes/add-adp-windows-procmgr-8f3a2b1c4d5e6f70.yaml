@@ -1,0 +1,7 @@
+---
+enhancements:
+  - |
+    Adds Agent Data Plane packaging to Windows Agent MSI installs. ADP is supervised by
+    dd-procmgr via ``processes.d/datadog-agent-data-plane.yaml`` by default; the
+    ``datadog-agent-data-plane`` Windows service remains registered for rollback when the
+    process definition is removed.
