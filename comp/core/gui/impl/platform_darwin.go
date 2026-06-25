@@ -6,7 +6,6 @@
 package guiimpl
 
 import (
-	"errors"
 	"os/exec"
 
 	template "github.com/DataDog/datadog-agent/pkg/template/html"
