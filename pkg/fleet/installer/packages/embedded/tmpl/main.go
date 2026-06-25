@@ -47,6 +47,30 @@ func generate(outputDir string) error {
 			return err
 		}
 	}
+	return syncMSIADPProcmgrConfig(outputDir)
+}
+
+// syncMSIADPProcmgrConfig copies the generated Windows ADP procmgr config into the MSI
+// CustomActions embedded resources. The MSI build only robocopies tools/windows, so the
+// resource must live under that tree rather than pkg/fleet/...
+func syncMSIADPProcmgrConfig(outputDir string) error {
+	source := filepath.Join(outputDir, "windows", "datadog-agent-data-plane.yaml")
+	content, err := os.ReadFile(source)
+	if err != nil {
+		return fmt.Errorf("read ADP procmgr config: %w", err)
+	}
+	tmplDir := filepath.Clean(filepath.Join(outputDir, ".."))
+	repoRoot := filepath.Clean(filepath.Join(tmplDir, "..", "..", "..", "..", "..", ".."))
+	dest := filepath.Join(
+		repoRoot,
+		"tools", "windows", "DatadogAgentInstaller", "CustomActions", "Resources", "datadog-agent-data-plane.yaml",
+	)
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return fmt.Errorf("create MSI resources dir: %w", err)
+	}
+	if err := os.WriteFile(dest, content, 0o644); err != nil {
+		return fmt.Errorf("write MSI ADP procmgr config: %w", err)
+	}
 	return nil
 }
 
