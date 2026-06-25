@@ -90,7 +90,7 @@ namespace Datadog.CustomActions.Extensions
 
             return new List<string>
             {
-                Path.Combine(installLocation, "processes.d"),
+                Path.Combine(installLocation, "processes.d", Constants.DataPlaneProcmgrConfigFileName),
             };
         }
 

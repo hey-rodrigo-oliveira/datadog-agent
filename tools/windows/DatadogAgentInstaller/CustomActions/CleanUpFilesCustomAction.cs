@@ -50,7 +50,39 @@ namespace Datadog.CustomActions
                 }
             }
 
+            TryRemoveEmptyProcessesD(session, projectLocation);
+
             return ActionResult.Success;
+        }
+
+        private static void TryRemoveEmptyProcessesD(ISession session, string projectLocation)
+        {
+            if (session.Property("RemoveEmptyProcessesD") != "1")
+            {
+                return;
+            }
+
+            var processesDir = Path.Combine(projectLocation, "processes.d");
+            try
+            {
+                if (!Directory.Exists(processesDir))
+                {
+                    return;
+                }
+
+                if (Directory.EnumerateFileSystemEntries(processesDir).Any())
+                {
+                    session.Log($"{processesDir} is not empty, skip deletion.");
+                    return;
+                }
+
+                session.Log($"Deleting empty directory \"{processesDir}\"");
+                Directory.Delete(processesDir);
+            }
+            catch (Exception e)
+            {
+                session.Log($"Error while deleting empty processes.d directory: {e}");
+            }
         }
 
         public static ActionResult CleanupFiles(Session session)
