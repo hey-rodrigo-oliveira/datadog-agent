@@ -7,6 +7,7 @@ package guiimpl
 
 import (
 	"errors"
+	"os/exec"
 
 	template "github.com/DataDog/datadog-agent/pkg/template/html"
 )
@@ -26,9 +27,9 @@ const instructionTemplate = `{{define "loginInstruction" }}
 {{end}}`
 
 func restartEnabled() bool {
-	return false
+	return true
 }
 
 func restart() error {
-	return errors.New("restarting the agent is not implemented on non-windows platforms")
+	return exec.Command("/bin/launchctl", "kickstart", "-k", "system/com.datadoghq.agent").Start()
 }
