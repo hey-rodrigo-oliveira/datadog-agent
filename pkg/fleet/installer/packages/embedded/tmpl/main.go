@@ -9,6 +9,7 @@ package main
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -65,7 +66,7 @@ func syncMSIADPProcmgrConfig(outputDir string) error {
 	}
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
-		return fmt.Errorf("locate tmpl source file")
+		return errors.New("locate tmpl source file")
 	}
 	tmplDir := filepath.Dir(thisFile)
 	repoRoot := filepath.Clean(filepath.Join(tmplDir, "..", "..", "..", "..", "..", ".."))
