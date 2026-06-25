@@ -127,10 +127,12 @@ random_property: test
 
                 var adpConfigPath = Path.Combine(projectLocation, "processes.d", "datadog-agent-data-plane.yaml");
                 var adpYaml = File.ReadAllText(adpConfigPath);
+                var installRoot = projectLocation.Replace('\\', '/');
+                var etcRoot = configFolder.Replace('\\', '/');
                 Assert.Contains("description: Datadog Agent Data Plane", adpYaml);
-                Assert.Contains($"command: '{Path.Combine(projectLocation, "bin", "agent", "agent-data-plane.exe")}'", adpYaml);
-                Assert.Contains($"- '{Path.Combine(configFolder, "datadog.yaml")}'", adpYaml);
-                Assert.Contains($"- '{Path.Combine(configFolder, "run", "agent-data-plane.pid")}'", adpYaml);
+                Assert.Contains($"command: '{installRoot}/bin/agent/agent-data-plane.exe'", adpYaml);
+                Assert.Contains($"- '{etcRoot}/datadog.yaml'", adpYaml);
+                Assert.Contains($"- '{etcRoot}/run/agent-data-plane.pid'", adpYaml);
                 Assert.Contains("restart: on-failure", adpYaml);
             });
         }

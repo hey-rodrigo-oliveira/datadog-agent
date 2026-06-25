@@ -113,6 +113,11 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="..\..\..\..\pkg\fleet\installer\packages\embedded\tmpl\gen\windows\datadog-agent-data-plane.yaml">
+      <Link>Resources\datadog-agent-data-plane.yaml</Link>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json">
       <Version>13.0.4</Version>
     </PackageReference>

@@ -18,6 +18,9 @@ namespace Datadog.CustomActions
     {
         private const string AiUsageNativeHostConfigName = "ai_usage_native_host.yaml";
         private const string AiUsageNativeHostName = "com.datadoghq.ai_prompt_logger.native_host";
+        private const string ADPInstallRootPlaceholder = "__ADP_INSTALL_ROOT__";
+        private const string ADPEtcRootPlaceholder = "__ADP_ETC_ROOT__";
+        private const string ADPWindowsProcmgrConfigResource = "Datadog.CustomActions.Resources.datadog-agent-data-plane.yaml";
 
         /// <summary>
         /// Subset of the Datadog config file that we are going to read.
@@ -470,36 +473,33 @@ namespace Datadog.CustomActions
             File.SetAccessControl(configPath, security);
         }
 
+        private static string NormalizePathForYaml(string path) => path.Replace('\\', '/');
+
+        private static string LoadADPWindowsProcmgrConfigTemplate()
+        {
+            using var stream = typeof(ConfigCustomActions).Assembly.GetManifestResourceStream(ADPWindowsProcmgrConfigResource);
+            if (stream == null)
+            {
+                throw new InvalidOperationException($"Missing embedded resource {ADPWindowsProcmgrConfigResource}");
+            }
+
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+
         private static void WriteADPProcmgrConfig(string projectLocation, string configFolder)
         {
             var adpProcmgrDir = Path.Combine(projectLocation, "processes.d");
             Directory.CreateDirectory(adpProcmgrDir);
 
             var adpProcmgrConfigPath = Path.Combine(adpProcmgrDir, "datadog-agent-data-plane.yaml");
-            var adpExePath = Path.Combine(projectLocation, "bin", "agent", "agent-data-plane.exe");
-            var datadogYamlPath = Path.Combine(configFolder, "datadog.yaml");
-            var pidfilePath = Path.Combine(configFolder, "run", "agent-data-plane.pid");
+            var installRoot = NormalizePathForYaml(projectLocation);
+            var etcRoot = NormalizePathForYaml(configFolder);
 
-            var adpProcmgrConfig = new[]
-            {
-                "description: Datadog Agent Data Plane",
-                $"command: '{adpExePath}'",
-                "args:",
-                "  - --config",
-                $"  - '{datadogYamlPath}'",
-                "  - run",
-                "  - --pidfile",
-                $"  - '{pidfilePath}'",
-                "auto_start: true",
-                $"condition_path_exists: '{adpExePath}'",
-                "restart: on-failure",
-                "restart_sec: 2",
-                "start_limit_interval_sec: 10",
-                "start_limit_burst: 5",
-                "stdout: inherit",
-                "stderr: inherit",
-            };
-            File.WriteAllText(adpProcmgrConfigPath, string.Join("\n", adpProcmgrConfig));
+            var adpProcmgrConfig = LoadADPWindowsProcmgrConfigTemplate()
+                .Replace(ADPInstallRootPlaceholder, installRoot)
+                .Replace(ADPEtcRootPlaceholder, etcRoot);
+            File.WriteAllText(adpProcmgrConfigPath, adpProcmgrConfig);
         }
 
         private static ActionResult WriteConfig(ISession session)
