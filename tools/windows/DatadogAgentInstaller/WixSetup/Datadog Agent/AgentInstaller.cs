@@ -727,7 +727,10 @@ namespace WixSetup.Datadog_Agent
             agentBinDir.AddFile(new WixSharp.File(_agentBinaries.AgentDataPlane, dataPlaneService));
             if (_agentFlavor.FlavorName == Constants.FipsFlavor)
             {
-                agentBinDir.Add(new Files($@"{BinSource}\aws_lc_fips_*_crypto.dll"));
+                foreach (var fipsDll in Directory.EnumerateFiles(BinSource, "aws_lc_fips_*_crypto.dll"))
+                {
+                    agentBinDir.AddFile(new WixSharp.File(fipsDll));
+                }
             }
             agentBinDir.Add(new EventSource
             {
