@@ -13,6 +13,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	template "github.com/DataDog/datadog-agent/pkg/template/text"
 )
@@ -28,6 +29,9 @@ func main() {
 
 	if err := generate(outputDir); err != nil {
 		log.Fatalf("Failed to generate templates: %v", err)
+	}
+	if err := syncMSIADPProcmgrConfig(outputDir); err != nil {
+		log.Fatalf("Failed to sync MSI ADP procmgr config: %v", err)
 	}
 }
 
@@ -47,7 +51,7 @@ func generate(outputDir string) error {
 			return err
 		}
 	}
-	return syncMSIADPProcmgrConfig(outputDir)
+	return nil
 }
 
 // syncMSIADPProcmgrConfig copies the generated Windows ADP procmgr config into the MSI
@@ -59,7 +63,11 @@ func syncMSIADPProcmgrConfig(outputDir string) error {
 	if err != nil {
 		return fmt.Errorf("read ADP procmgr config: %w", err)
 	}
-	tmplDir := filepath.Clean(filepath.Join(outputDir, ".."))
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("locate tmpl source file")
+	}
+	tmplDir := filepath.Dir(thisFile)
 	repoRoot := filepath.Clean(filepath.Join(tmplDir, "..", "..", "..", "..", "..", ".."))
 	dest := filepath.Join(
 		repoRoot,
