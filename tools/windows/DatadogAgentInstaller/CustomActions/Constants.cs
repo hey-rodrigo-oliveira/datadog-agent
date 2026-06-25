@@ -14,6 +14,7 @@ namespace Datadog.CustomActions
         public const string ProcmonServiceName = "ddprocmon";
         public const string ProcmgrServiceName = "dd-procmgr-service";
         public const string DataPlaneServiceName = "datadog-agent-data-plane";
+        public const string DataPlaneProcmgrConfigFileName = "datadog-agent-data-plane.yaml";
 
         // Key under HKLM that contains our options
         public const string DatadogAgentRegistryKey = @"Software\Datadog\Datadog Agent";

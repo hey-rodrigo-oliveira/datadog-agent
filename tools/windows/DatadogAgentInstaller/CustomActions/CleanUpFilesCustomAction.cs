@@ -20,7 +20,8 @@ namespace Datadog.CustomActions
                 Path.Combine(projectLocation, "python-scripts"),
             }
             // installation specific files
-            .Concat(session.GeneratedPaths());
+            .Concat(session.GeneratedPaths())
+            .Concat(session.InstallLocationGeneratedPaths());
 
             foreach (var path in toDelete)
             {
