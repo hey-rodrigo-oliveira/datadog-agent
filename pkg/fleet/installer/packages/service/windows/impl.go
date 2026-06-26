@@ -145,7 +145,6 @@ func (w *WinServiceManager) terminateServiceProcess(ctx context.Context, service
 func (w *WinServiceManager) StopAllAgentServices(ctx context.Context) (err error) {
 	allAgentServices := []string{
 		"datadog-otel-agent",
-		"datadog-agent-data-plane",
 		"dd-procmgr-service",
 		"datadog-trace-agent",
 		"datadog-process-agent",

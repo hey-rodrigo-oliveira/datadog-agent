@@ -174,13 +174,10 @@ func (s *testUpgradeRollbackSuite) TestUpgradeRollback() {
 	// the previous version should be functional
 	RequireAgentVersionRunningWithNoErrors(s.T(), s.NewTestClientForHost(vm), previousAgentPackage.AgentVersion())
 
-	// Ensure stable services are still installed; ADP procmgr is not in stable yet.
-	_, err = windowsCommon.GetServiceConfigMap(vm, servicetest.ExpectedInstalledServicesAfterStableUpgradeRollback())
+	// Ensure services are still installed
+	// NOTE: will need to update this if we add or remove services
+	_, err = windowsCommon.GetServiceConfigMap(vm, servicetest.ExpectedInstalledServices())
 	s.Assert().NoError(err, "services should still be installed")
-	for _, service := range servicetest.ServicesAbsentAfterStableUpgradeRollback() {
-		_, err = windowsCommon.GetServiceConfig(vm, service)
-		s.Assert().Error(err, "service %s should not be installed after rollback from stable", service)
-	}
 
 	s.uninstallAgent()
 }

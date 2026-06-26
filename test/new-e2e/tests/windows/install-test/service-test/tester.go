@@ -8,7 +8,6 @@ package servicetest
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	infraCommon "github.com/DataDog/datadog-agent/test/e2e-framework/common"
@@ -102,7 +101,6 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	m["datadog-process-agent"].ServiceType = windowsCommon.SERVICE_WIN32_OWN_PROCESS
 	m["datadog-security-agent"].ServiceType = windowsCommon.SERVICE_WIN32_OWN_PROCESS
 	m["datadog-system-probe"].ServiceType = windowsCommon.SERVICE_WIN32_OWN_PROCESS
-	m["datadog-agent-data-plane"].ServiceType = windowsCommon.SERVICE_WIN32_OWN_PROCESS
 	m["ddnpm"].ServiceType = windowsCommon.SERVICE_KERNEL_DRIVER
 	m["ddprocmon"].ServiceType = windowsCommon.SERVICE_KERNEL_DRIVER
 
@@ -112,7 +110,6 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	m["datadog-process-agent"].StartType = windowsCommon.SERVICE_DEMAND_START
 	m["datadog-security-agent"].StartType = windowsCommon.SERVICE_DEMAND_START
 	m["datadog-system-probe"].StartType = windowsCommon.SERVICE_DEMAND_START
-	m["datadog-agent-data-plane"].StartType = windowsCommon.SERVICE_DEMAND_START
 	m["ddnpm"].StartType = windowsCommon.SERVICE_DISABLED
 	m["ddprocmon"].StartType = windowsCommon.SERVICE_DISABLED
 
@@ -122,7 +119,6 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	m["datadog-process-agent"].ServicesDependedOn = []string{"datadogagent"}
 	m["datadog-security-agent"].ServicesDependedOn = []string{"datadogagent"}
 	m["datadog-system-probe"].ServicesDependedOn = []string{"datadogagent"}
-	m["datadog-agent-data-plane"].ServicesDependedOn = []string{"datadogagent"}
 	m["ddnpm"].ServicesDependedOn = []string{}
 	m["ddprocmon"].ServicesDependedOn = []string{}
 
@@ -132,7 +128,6 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	m["datadog-process-agent"].DisplayName = "Datadog Process Agent"
 	m["datadog-security-agent"].DisplayName = "Datadog Security Agent"
 	m["datadog-system-probe"].DisplayName = "Datadog System Probe"
-	m["datadog-agent-data-plane"].DisplayName = "Datadog Agent Data Plane"
 	m["ddnpm"].DisplayName = "Datadog Network Performance Monitor"
 	m["ddprocmon"].DisplayName = "Datadog Process Monitor"
 
@@ -149,8 +144,6 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	m["datadog-security-agent"].ImagePath = exePath
 	exePath = quotePathIfContainsSpaces(t.expectedInstallPath + "\\bin\\agent\\system-probe.exe")
 	m["datadog-system-probe"].ImagePath = exePath
-	exePath = quotePathIfContainsSpaces(t.expectedInstallPath + "\\bin\\agent\\agent-data-plane.exe")
-	m["datadog-agent-data-plane"].ImagePath = fmt.Sprintf(`%s --config="%s\\datadog.yaml" run --pidfile "%s\\run\\agent-data-plane.pid"`, exePath, t.expectedConfigRoot, t.expectedConfigRoot)
 	// drivers use the kernel path syntax and aren't quoted since they are file paths rather than command lines
 	m["ddnpm"].ImagePath = fmt.Sprintf(`\??\%s\bin\agent\driver\ddnpm.sys`, t.expectedInstallPath)
 	m["ddprocmon"].ImagePath = fmt.Sprintf(`\??\%s\bin\agent\driver\ddprocmon.sys`, t.expectedInstallPath)
@@ -162,7 +155,6 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	m["datadog-security-agent"].UserName = expectedServiceUser
 	m["datadog-process-agent"].UserName = "LocalSystem"
 	m["datadog-system-probe"].UserName = "LocalSystem"
-	m["datadog-agent-data-plane"].UserName = expectedServiceUser
 	for _, s := range m {
 		if !windowsCommon.IsUserModeServiceType(s.ServiceType) {
 			continue
@@ -176,8 +168,6 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	return m, nil
 }
 
-const dataPlaneServiceName = "datadog-agent-data-plane"
-
 // ExpectedInstalledServices returns the list of services expected to be installed
 func ExpectedInstalledServices() []string {
 	return []string{
@@ -186,25 +176,9 @@ func ExpectedInstalledServices() []string {
 		"datadog-process-agent",
 		"datadog-security-agent",
 		"datadog-system-probe",
-		dataPlaneServiceName,
 		"ddnpm",
 		"ddprocmon",
 	}
-}
-
-// ExpectedInstalledServicesAfterStableUpgradeRollback returns services that should remain
-// after a failed upgrade from the last stable release is rolled back. Stable builds
-// predate Windows ADP procmgr, so datadog-agent-data-plane is not registered yet.
-func ExpectedInstalledServicesAfterStableUpgradeRollback() []string {
-	return slices.DeleteFunc(slices.Clone(ExpectedInstalledServices()), func(s string) bool {
-		return s == dataPlaneServiceName
-	})
-}
-
-// ServicesAbsentAfterStableUpgradeRollback returns services that must not be present
-// after rollback to the last stable release.
-func ServicesAbsentAfterStableUpgradeRollback() []string {
-	return []string{dataPlaneServiceName}
 }
 
 // ExpectedRunningServices returns the list of services expected to be running after installation
