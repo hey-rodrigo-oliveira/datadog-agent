@@ -78,6 +78,7 @@ var (
 	hostProfilerLogFile        = defaultHostProfilerLogFile
 	privateActionRunnerLogFile = defaultPrivateActionRunnerLogFile
 	systemProbeLogFile         = defaultSystemProbeLogFile
+	dataPlaneLogFile           = defaultDataPlaneLogFile
 
 	// Flare directories
 	checkFlareDirectory = "c:\\programdata\\datadog\\logs\\checks\\"
@@ -114,6 +115,7 @@ func init() {
 		hostProfilerLogFile = filepath.Join(pd, "logs", "host-profiler.log")
 		privateActionRunnerLogFile = filepath.Join(pd, "logs", "private-action-runner.log")
 		systemProbeLogFile = filepath.Join(pd, "logs", "system-probe.log")
+		dataPlaneLogFile = filepath.Join(pd, "logs", "agent-data-plane.log")
 		checkFlareDirectory = filepath.Join(pd, "logs", "checks") + "\\"
 		jmxFlareDirectory = filepath.Join(pd, "logs", "jmxinfo") + "\\"
 		runPath = filepath.Join(pd, "run")
@@ -318,5 +320,5 @@ func GetDefaultDDAgentBin() string {
 
 // GetDefaultDataPlaneLogFile returns the default log file used by the data-plane agent if not configured
 func GetDefaultDataPlaneLogFile() string {
-	return defaultDataPlaneLogFile
+	return dataPlaneLogFile
 }
