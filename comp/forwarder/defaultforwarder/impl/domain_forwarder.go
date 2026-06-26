@@ -322,6 +322,9 @@ func (f *domainForwarder) Stop(purgeHighPrio bool) {
 	for t := range f.requeuedTransaction {
 		f.requeueTransaction(t)
 	}
+	for t := range f.lowPrio {
+		f.requeueTransaction(t)
+	}
 	if err := f.retryQueue.FlushToDisk(); err != nil {
 		f.log.Errorf("Error when flushing the retry queue to disk: %v", err)
 	}

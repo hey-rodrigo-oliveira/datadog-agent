@@ -105,6 +105,38 @@ func TestTransactionRetryQueueFlushAllToDisk(t *testing.T) {
 	a.Equal(int64(0), q.GetDiskSpaceUsed())
 }
 
+// TestTransactionRetryQueueFlushToDiskMultipleWrites verifies that FlushToDisk
+// loops until all transactions are written, issuing a separate Store call for
+// each batch bounded by maxMemSizeInBytes.
+//
+// The inner loop in extractTransactionsFromMemory exits as soon as
+// sizeInBytesExtracted >= payloadSizeInBytesToExtract, so with
+// maxMemSizeInBytes=10 and exactly-10-byte payloads, each call extracts one
+// transaction and leaves the rest in memory. Three transactions therefore
+// require three Store calls and produce three files on disk.
+func TestTransactionRetryQueueFlushToDiskMultipleWrites(t *testing.T) {
+	a := assert.New(t)
+	q := newOnDiskRetryQueueTest(t, a)
+
+	container := NewTransactionRetryQueue(createDropPrioritySorter(), q, 10, 0.1, NewTransactionRetryQueueTelemetry("domain"), NewPointCountTelemetryMock())
+
+	// Bypass Add to plant three transactions in memory simultaneously.
+	// This mirrors the shutdown path: requeuedTransaction and lowPrio items are
+	// all added to the retry queue before FlushToDisk is called, which can push
+	// currentMemSizeInBytes above maxMemSizeInBytes.
+	container.transactions = append(container.transactions,
+		createTransactionWithPayloadSize(10),
+		createTransactionWithPayloadSize(10),
+		createTransactionWithPayloadSize(10),
+	)
+	container.currentMemSizeInBytes = 30
+
+	err := container.FlushToDisk()
+	a.NoError(err)
+	a.Equal(0, container.GetTransactionCount())
+	a.Equal(3, q.getFilesCount())
+}
+
 func TestTransactionRetryQueueNoTransactionStorage(t *testing.T) {
 	a := assert.New(t)
 	pointDropped := transactionContainerPointDroppedCountTelemetry.expvar.Value()
