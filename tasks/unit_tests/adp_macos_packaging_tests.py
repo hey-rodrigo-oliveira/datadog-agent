@@ -86,12 +86,19 @@ class TestADPMacOSPackaging(unittest.TestCase):
                 self.assertIn(f"launchctl bootout system/{label}", uninstall)
                 self.assertIn(plist, uninstall)
 
-    def test_windows_msi_embeds_generated_adp_procmgr_config(self):
-        generated = (
+    def test_windows_adp_procmgr_config_is_embedded_for_fleet_installer(self):
+        generated_path = (
             REPO_ROOT / "pkg/fleet/installer/packages/embedded/tmpl/gen/windows/datadog-agent-data-plane.yaml"
-        ).read_text()
-        embedded = (
-            REPO_ROOT / "tools/windows/DatadogAgentInstaller/CustomActions/Resources/datadog-agent-data-plane.yaml"
+        )
+        generated = generated_path.read_text()
+        embed_go = (REPO_ROOT / "pkg/fleet/installer/packages/embedded/embed.go").read_text()
+        adp_procmgr = (
+            REPO_ROOT / "pkg/fleet/installer/packages/processmanager/adp_procmgr_config_windows.go"
         ).read_text()
 
-        self.assertEqual(generated, embedded)
+        self.assertIn("__ADP_INSTALL_ROOT__", generated)
+        self.assertIn("__ADP_ETC_ROOT__", generated)
+        self.assertIn("agent-data-plane.exe", generated)
+        self.assertIn("tmpl/gen/windows/datadog-agent-data-plane.yaml", embed_go)
+        self.assertIn("ADPWindowsProcmgrConfig", embed_go)
+        self.assertIn("embedded.ADPWindowsProcmgrConfig", adp_procmgr)
