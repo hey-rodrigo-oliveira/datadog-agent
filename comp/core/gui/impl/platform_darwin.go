@@ -11,7 +11,6 @@ import (
 	"net/http"
 
 	sysprobeclient "github.com/DataDog/datadog-agent/pkg/system-probe/api/client"
-	"github.com/DataDog/datadog-agent/pkg/util/defaultpaths"
 	template "github.com/DataDog/datadog-agent/pkg/template/html"
 )
 
@@ -29,16 +28,33 @@ const instructionTemplate = `{{define "loginInstruction" }}
 <p>Note: If you would like to adjust the GUI session timeout, you can modify the <code>GUI_session_expiration</code> parameter in <code>datadog.yaml</code>
 {{end}}`
 
+// restartAuthToken and sysprobeSocketPath are set once at GUI component startup.
+var restartAuthToken string
+var sysprobeSocketPath string
+
+func setRestartAuthToken(token string) {
+	restartAuthToken = token
+}
+
+func setSysprobeSocketPath(path string) {
+	sysprobeSocketPath = path
+}
+
 func restartEnabled() bool {
 	return true
 }
 
 func restart() error {
-	socketPath := defaultpaths.GetDefaultSystemProbeAddress()
-	client := sysprobeclient.Get(socketPath)
+	client := sysprobeclient.Get(sysprobeSocketPath)
 
 	url := sysprobeclient.URL("/agent-restart")
-	resp, err := client.Post(url, "", nil)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("could not build restart request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+restartAuthToken)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not reach system-probe: %w", err)
 	}

@@ -8,23 +8,33 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"os/exec"
+	"time"
 )
 
-var agentServices = []string{
-	"system/com.datadoghq.agent",
-	"system/com.datadoghq.sysprobe",
+func kickstart(service string) error {
+	cmd := exec.Command("/bin/launchctl", "kickstart", "-k", service)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s", string(out))
+	}
+	return nil
 }
 
 func handleAgentRestart(w http.ResponseWriter, r *http.Request) {
-	for _, service := range agentServices {
-		cmd := exec.Command("/bin/launchctl", "kickstart", "-k", service)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			http.Error(w, string(out), http.StatusInternalServerError)
-			return
-		}
-	}
+	// Reply 200 immediately so the client receives the response before launchd
+	// tears down this process when sysprobe is restarted.
 	w.WriteHeader(http.StatusOK)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	// Restart both services after a short delay so the HTTP response has time
+	// to be delivered before launchd sends SIGTERM to this process.
+	time.AfterFunc(100*time.Millisecond, func() {
+		_ = kickstart("system/com.datadoghq.agent")
+		_ = kickstart("system/com.datadoghq.sysprobe")
+	})
 }

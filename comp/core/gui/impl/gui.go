@@ -29,6 +29,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/flare"
 	guidef "github.com/DataDog/datadog-agent/comp/core/gui/def"
 	"github.com/DataDog/datadog-agent/comp/core/hostname/hostnameinterface/def"
+	ipc "github.com/DataDog/datadog-agent/comp/core/ipc/def"
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	"github.com/DataDog/datadog-agent/comp/core/status"
 	compdef "github.com/DataDog/datadog-agent/comp/def"
@@ -74,6 +75,7 @@ type Requires struct {
 	Status   status.Component
 	Lc       compdef.Lifecycle
 	Hostname hostnameinterface.Component
+	Ipc      ipc.Component
 }
 
 // Provides defines the output of the gui component.
@@ -120,6 +122,12 @@ func NewComponent(deps Requires) Provides {
 
 	sessionExpiration := deps.Config.GetDuration("GUI_session_expiration")
 	g.auth = newAuthenticator(authToken, sessionExpiration)
+	setRestartAuthToken(deps.Ipc.GetAuthToken())
+	socketPath := deps.Config.GetString("system_probe_config.sysprobe_socket")
+	if socketPath == "" {
+		socketPath = defaultpaths.GetDefaultSystemProbeAddress()
+	}
+	setSysprobeSocketPath(socketPath)
 
 	// register the public routes
 	publicRouter.HandleFunc("GET /{$}", renderIndexPage)
