@@ -331,7 +331,7 @@ func NewDefaultForwarder(config config.Component, log log.Component, options *Op
 
 	flushToDiskMemRatio := config.GetFloat64("forwarder_flush_to_disk_mem_ratio")
 	domainForwarderSort := transaction.SortByCreatedTimeAndPriority{HighPriorityFirst: true}
-	transactionContainerSort := transaction.SortByCreatedTimeAndPriority{HighPriorityFirst: false}
+	transactionContainerSort := transaction.SortByCreatedTimeAndPriority{HighPriorityFirst: true}
 
 	for domain, resolver := range options.DomainResolvers {
 		domain, _ := utils.AddAgentVersionToDomain(domain, "app")
