@@ -6,8 +6,12 @@
 package guiimpl
 
 import (
-	"os/exec"
+	"fmt"
+	"io"
+	"net/http"
 
+	sysprobeclient "github.com/DataDog/datadog-agent/pkg/system-probe/api/client"
+	"github.com/DataDog/datadog-agent/pkg/util/defaultpaths"
 	template "github.com/DataDog/datadog-agent/pkg/template/html"
 )
 
@@ -30,5 +34,19 @@ func restartEnabled() bool {
 }
 
 func restart() error {
-	return exec.Command("/bin/launchctl", "kickstart", "-k", "system/com.datadoghq.agent").Run()
+	socketPath := defaultpaths.GetDefaultSystemProbeAddress()
+	client := sysprobeclient.Get(socketPath)
+
+	url := sysprobeclient.URL("/agent-restart")
+	resp, err := client.Post(url, "", nil)
+	if err != nil {
+		return fmt.Errorf("could not reach system-probe: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("system-probe agent restart failed: %s", string(body))
+	}
+	return nil
 }

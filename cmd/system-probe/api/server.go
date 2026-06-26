@@ -64,6 +64,10 @@ func StartServer(cfg *sysconfigtypes.Config, settings settings.Component, rcclie
 		mux.HandleFunc("/debug/selinux_semodule_list", debug.HandleSelinuxSemoduleList)
 	}
 
+	if runtime.GOOS == "darwin" {
+		mux.HandleFunc("POST /agent-restart", handleAgentRestart)
+	}
+
 	// Register /coverage endpoint for computing code coverage (e2ecoverage build only).
 	coverage.SetupCoverageHandler(mux)
 
