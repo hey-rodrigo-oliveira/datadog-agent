@@ -1390,6 +1390,7 @@ workflow:
       paths:
         - comp/core/agenttelemetry/**/*
         - pkg/util/log/errortracking/**/*
+        - test/new-e2e/tests/agent-telemetry/**/*
       compare_to: $COMPARE_TO_BRANCH
     when: on_success
 
