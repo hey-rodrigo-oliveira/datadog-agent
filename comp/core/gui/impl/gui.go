@@ -122,7 +122,7 @@ func NewComponent(deps Requires) Provides {
 
 	sessionExpiration := deps.Config.GetDuration("GUI_session_expiration")
 	g.auth = newAuthenticator(authToken, sessionExpiration)
-	setRestartAuthToken(deps.Ipc.GetAuthToken())
+	setGetAuthToken(deps.Ipc.GetAuthToken)
 	socketPath := deps.Config.GetString("system_probe_config.sysprobe_socket")
 	if socketPath == "" {
 		socketPath = defaultpaths.GetDefaultSystemProbeAddress()

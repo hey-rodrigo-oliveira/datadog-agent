@@ -160,12 +160,12 @@ func TestRestartEnabled(t *testing.T) {
 	assert.True(t, restartEnabled())
 }
 
-func TestSetRestartAuthToken(t *testing.T) {
-	orig := restartAuthToken
-	t.Cleanup(func() { restartAuthToken = orig })
+func TestSetGetAuthToken(t *testing.T) {
+	orig := getAuthToken
+	t.Cleanup(func() { getAuthToken = orig })
 
-	setRestartAuthToken("test-token")
-	assert.Equal(t, "test-token", restartAuthToken)
+	setGetAuthToken(func() string { return "test-token" })
+	assert.Equal(t, "test-token", getAuthToken())
 }
 
 func TestSetSysprobeSocketPath(t *testing.T) {
@@ -185,22 +185,27 @@ func TestRestart_Success(t *testing.T) {
 	}))
 
 	origSocket := sysprobeSocketPath
-	origToken := restartAuthToken
+	origToken := getAuthToken
 	t.Cleanup(func() {
 		sysprobeSocketPath = origSocket
-		restartAuthToken = origToken
+		getAuthToken = origToken
 	})
 	setSysprobeSocketPath(socketPath)
-	setRestartAuthToken("test-token")
+	setGetAuthToken(func() string { return "test-token" })
 
 	err := restart()
 	assert.NoError(t, err)
 }
 
 func TestRestart_SysprobeUnreachable(t *testing.T) {
-	orig := sysprobeSocketPath
-	t.Cleanup(func() { sysprobeSocketPath = orig })
+	origSocket := sysprobeSocketPath
+	origToken := getAuthToken
+	t.Cleanup(func() {
+		sysprobeSocketPath = origSocket
+		getAuthToken = origToken
+	})
 	setSysprobeSocketPath("/tmp/gui-test-nonexistent.sock")
+	setGetAuthToken(func() string { return "token" })
 
 	err := restart()
 	require.Error(t, err)
@@ -212,9 +217,14 @@ func TestRestart_SysprobeReturnsError(t *testing.T) {
 		http.Error(w, "launchctl failed", http.StatusInternalServerError)
 	}))
 
-	orig := sysprobeSocketPath
-	t.Cleanup(func() { sysprobeSocketPath = orig })
+	origSocket := sysprobeSocketPath
+	origToken := getAuthToken
+	t.Cleanup(func() {
+		sysprobeSocketPath = origSocket
+		getAuthToken = origToken
+	})
 	setSysprobeSocketPath(socketPath)
+	setGetAuthToken(func() string { return "token" })
 
 	err := restart()
 	require.Error(t, err)
@@ -230,13 +240,13 @@ func TestRestart_SendsAuthorizationHeader(t *testing.T) {
 	}))
 
 	origSocket := sysprobeSocketPath
-	origToken := restartAuthToken
+	origToken := getAuthToken
 	t.Cleanup(func() {
 		sysprobeSocketPath = origSocket
-		restartAuthToken = origToken
+		getAuthToken = origToken
 	})
 	setSysprobeSocketPath(socketPath)
-	setRestartAuthToken("secret-ipc-token")
+	setGetAuthToken(func() string { return "secret-ipc-token" })
 
 	require.NoError(t, restart())
 	assert.Equal(t, fmt.Sprintf("Bearer %s", "secret-ipc-token"), receivedAuth)

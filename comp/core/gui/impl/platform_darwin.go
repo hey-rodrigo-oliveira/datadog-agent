@@ -28,12 +28,14 @@ const instructionTemplate = `{{define "loginInstruction" }}
 <p>Note: If you would like to adjust the GUI session timeout, you can modify the <code>GUI_session_expiration</code> parameter in <code>datadog.yaml</code>
 {{end}}`
 
-// restartAuthToken and sysprobeSocketPath are set once at GUI component startup.
-var restartAuthToken string
+// getAuthToken is a function that fetches the IPC auth token on each call,
+// avoiding storage of the credential as a long-lived global.
+// sysprobeSocketPath holds the Unix socket path, set once at startup.
+var getAuthToken func() string
 var sysprobeSocketPath string
 
-func setRestartAuthToken(token string) {
-	restartAuthToken = token
+func setGetAuthToken(f func() string) {
+	getAuthToken = f
 }
 
 func setSysprobeSocketPath(path string) {
@@ -52,7 +54,7 @@ func restart() error {
 	if err != nil {
 		return fmt.Errorf("could not build restart request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+restartAuthToken)
+	req.Header.Set("Authorization", "Bearer "+getAuthToken())
 
 	resp, err := client.Do(req)
 	if err != nil {
