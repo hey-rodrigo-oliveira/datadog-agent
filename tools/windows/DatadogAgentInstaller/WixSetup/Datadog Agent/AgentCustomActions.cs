@@ -346,7 +346,7 @@ namespace WixSetup.Datadog_Agent
                 Impersonate = false
             }
                 .SetProperties(
-                    "PROJECTLOCATION=[PROJECTLOCATION], APPLICATIONDATADIRECTORY=[APPLICATIONDATADIRECTORY], CleanupProcessesDOnUninstall=1");
+                    "PROJECTLOCATION=[PROJECTLOCATION], APPLICATIONDATADIRECTORY=[APPLICATIONDATADIRECTORY]");
 
             RunPreRemovePythonScript = new CustomAction<CustomActions>(
                     new Id(nameof(RunPreRemovePythonScript)),

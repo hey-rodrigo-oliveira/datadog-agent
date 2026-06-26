@@ -20,8 +20,7 @@ namespace Datadog.CustomActions
                 Path.Combine(projectLocation, "python-scripts"),
             }
             // installation specific files
-            .Concat(session.GeneratedPaths())
-            .Concat(session.InstallLocationGeneratedPaths());
+            .Concat(session.GeneratedPaths());
 
             foreach (var path in toDelete)
             {
@@ -50,62 +49,7 @@ namespace Datadog.CustomActions
                 }
             }
 
-            TryRemoveProcessesDOnUninstall(session, projectLocation);
-            TryRemoveProcessesDirIfEmpty(session, projectLocation);
-
             return ActionResult.Success;
-        }
-
-        private static void TryRemoveProcessesDOnUninstall(ISession session, string projectLocation)
-        {
-            if (session.Property("CleanupProcessesDOnUninstall") != "1")
-            {
-                return;
-            }
-
-            TryRemoveProcessesDir(session, projectLocation, recursive: true);
-        }
-
-        private static void TryRemoveProcessesDirIfEmpty(ISession session, string projectLocation)
-        {
-            var processesDir = Path.Combine(projectLocation, "processes.d");
-            try
-            {
-                if (!Directory.Exists(processesDir))
-                {
-                    return;
-                }
-
-                if (Directory.EnumerateFileSystemEntries(processesDir).Any())
-                {
-                    return;
-                }
-
-                TryRemoveProcessesDir(session, projectLocation, recursive: false);
-            }
-            catch (Exception e)
-            {
-                session.Log($"Error while checking processes.d directory: {e}");
-            }
-        }
-
-        private static void TryRemoveProcessesDir(ISession session, string projectLocation, bool recursive)
-        {
-            var processesDir = Path.Combine(projectLocation, "processes.d");
-            try
-            {
-                if (!Directory.Exists(processesDir))
-                {
-                    return;
-                }
-
-                session.Log($"Deleting directory \"{processesDir}\"");
-                Directory.Delete(processesDir, recursive);
-            }
-            catch (Exception e)
-            {
-                session.Log($"Error while deleting processes.d directory: {e}");
-            }
         }
 
         public static ActionResult CleanupFiles(Session session)

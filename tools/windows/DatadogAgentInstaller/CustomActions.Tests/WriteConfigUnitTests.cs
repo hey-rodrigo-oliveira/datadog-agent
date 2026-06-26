@@ -112,34 +112,6 @@ random_property: test
 
         [Theory]
         [InlineAutoData]
-        public void WriteConfig_Should_Generate_ADP_ProcessManager_Config(Mock<ISession> sessionMock)
-        {
-            WithTempInstallFolders((configFolder, projectLocation) =>
-            {
-                File.WriteAllText(Path.Combine(configFolder, "datadog.yaml.example"), "api_key:\n");
-                WriteAiUsageNativeHostExample(configFolder);
-                sessionMock.Setup(session => session["APPLICATIONDATADIRECTORY"]).Returns(configFolder);
-                sessionMock.Setup(session => session["PROJECTLOCATION"]).Returns(projectLocation);
-
-                var result = InvokeWriteConfig(sessionMock.Object);
-
-                Assert.Equal(ActionResult.Success, result);
-
-                var adpConfigPath = Path.Combine(projectLocation, "processes.d", "datadog-agent-data-plane.yaml");
-                var adpYaml = File.ReadAllText(adpConfigPath);
-                var installRoot = projectLocation.Replace('\\', '/');
-                var etcRoot = configFolder.Replace('\\', '/');
-                Assert.Contains("description: Datadog Agent Data Plane", adpYaml);
-                Assert.Contains($"command: '{installRoot}/bin/agent/agent-data-plane.exe'", adpYaml);
-                Assert.Contains($"- '{etcRoot}/datadog.yaml'", adpYaml);
-                Assert.Contains($"- '{etcRoot}/run/agent-data-plane.pid'", adpYaml);
-                Assert.DoesNotContain("DD_FLEET_POLICIES_DIR", adpYaml);
-                Assert.Contains("restart: on-failure", adpYaml);
-            });
-        }
-
-        [Theory]
-        [InlineAutoData]
         public void WriteConfig_Should_Generate_AiUsageNativeHostConfig_With_DatadogYaml_Apm_Port(Mock<ISession> sessionMock)
         {
             WithTempInstallFolders((configFolder, projectLocation) =>

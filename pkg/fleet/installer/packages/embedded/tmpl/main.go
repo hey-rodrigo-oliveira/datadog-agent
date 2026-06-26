@@ -9,12 +9,10 @@ package main
 import (
 	"bytes"
 	"embed"
-	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	template "github.com/DataDog/datadog-agent/pkg/template/text"
 )
@@ -30,9 +28,6 @@ func main() {
 
 	if err := generate(outputDir); err != nil {
 		log.Fatalf("Failed to generate templates: %v", err)
-	}
-	if err := syncMSIADPProcmgrConfig(outputDir); err != nil {
-		log.Fatalf("Failed to sync MSI ADP procmgr config: %v", err)
 	}
 }
 
@@ -51,34 +46,6 @@ func generate(outputDir string) error {
 		if err := lay.writeFilesToSubdir(outputDir); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-// syncMSIADPProcmgrConfig copies the generated Windows ADP procmgr config into the MSI
-// CustomActions embedded resources. The MSI build only robocopies tools/windows, so the
-// resource must live under that tree rather than pkg/fleet/...
-func syncMSIADPProcmgrConfig(outputDir string) error {
-	source := filepath.Join(outputDir, "windows", "datadog-agent-data-plane.yaml")
-	content, err := os.ReadFile(source)
-	if err != nil {
-		return fmt.Errorf("read ADP procmgr config: %w", err)
-	}
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		return errors.New("locate tmpl source file")
-	}
-	tmplDir := filepath.Dir(thisFile)
-	repoRoot := filepath.Clean(filepath.Join(tmplDir, "..", "..", "..", "..", "..", ".."))
-	dest := filepath.Join(
-		repoRoot,
-		"tools", "windows", "DatadogAgentInstaller", "CustomActions", "Resources", "datadog-agent-data-plane.yaml",
-	)
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return fmt.Errorf("create MSI resources dir: %w", err)
-	}
-	if err := os.WriteFile(dest, content, 0o644); err != nil {
-		return fmt.Errorf("write MSI ADP procmgr config: %w", err)
 	}
 	return nil
 }
