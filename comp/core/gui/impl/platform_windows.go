@@ -33,6 +33,9 @@ const instructionTemplate = `{{define "loginInstruction" }}
 <p>Note: If you would like to adjust the GUI session timeout, you can modify the <code>GUI_session_expiration</code> parameter in <code>datadog.yaml</code>
 {{end}}`
 
+func setRestartAuthToken(_ string) {}
+func setSysprobeSocketPath(_ string) {}
+
 func restartEnabled() bool {
 	return true
 }

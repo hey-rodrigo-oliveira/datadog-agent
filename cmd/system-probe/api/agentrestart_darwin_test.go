@@ -34,13 +34,20 @@ func TestHandleAgentRestart_Returns200Immediately(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 }
 
-func TestHandleAgentRestart_KickstartsServicesAsynchronously(t *testing.T) {
+func TestHandleAgentRestart_ServiceRestartSequence(t *testing.T) {
+	// expectedServices defines the exact order in which launchd services must be restarted.
+	// Agent must come before sysprobe because restarting sysprobe sends SIGTERM to this process.
+	expectedServices := []string{
+		"system/com.datadoghq.agent",
+		"system/com.datadoghq.sysprobe",
+	}
+
 	var called []string
 	done := make(chan struct{})
 
 	withMockKickstart(t, func(svc string) error {
 		called = append(called, svc)
-		if len(called) == 2 {
+		if len(called) == len(expectedServices) {
 			close(done)
 		}
 		return nil
@@ -60,30 +67,5 @@ func TestHandleAgentRestart_KickstartsServicesAsynchronously(t *testing.T) {
 		t.Fatal("kickstart was not called within timeout")
 	}
 
-	assert.Equal(t, []string{"system/com.datadoghq.agent", "system/com.datadoghq.sysprobe"}, called)
-}
-
-func TestHandleAgentRestart_KickstartsAgentBeforeSysprobe(t *testing.T) {
-	var order []string
-	done := make(chan struct{})
-
-	withMockKickstart(t, func(svc string) error {
-		order = append(order, svc)
-		if len(order) == 2 {
-			close(done)
-		}
-		return nil
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/agent-restart", nil)
-	handleAgentRestart(httptest.NewRecorder(), req)
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("kickstart was not called within timeout")
-	}
-
-	assert.Equal(t, "system/com.datadoghq.agent", order[0], "agent should be restarted before sysprobe")
-	assert.Equal(t, "system/com.datadoghq.sysprobe", order[1])
+	assert.Equal(t, expectedServices, called)
 }
