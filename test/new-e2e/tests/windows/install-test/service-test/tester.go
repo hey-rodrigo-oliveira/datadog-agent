@@ -8,6 +8,7 @@ package servicetest
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	infraCommon "github.com/DataDog/datadog-agent/test/e2e-framework/common"
@@ -175,6 +176,8 @@ func (t *Tester) ExpectedServiceConfig() (windowsCommon.ServiceConfigMap, error)
 	return m, nil
 }
 
+const dataPlaneServiceName = "datadog-agent-data-plane"
+
 // ExpectedInstalledServices returns the list of services expected to be installed
 func ExpectedInstalledServices() []string {
 	return []string{
@@ -183,10 +186,25 @@ func ExpectedInstalledServices() []string {
 		"datadog-process-agent",
 		"datadog-security-agent",
 		"datadog-system-probe",
-		"datadog-agent-data-plane",
+		dataPlaneServiceName,
 		"ddnpm",
 		"ddprocmon",
 	}
+}
+
+// ExpectedInstalledServicesAfterStableUpgradeRollback returns services that should remain
+// after a failed upgrade from the last stable release is rolled back. Stable builds
+// predate Windows ADP procmgr, so datadog-agent-data-plane is not registered yet.
+func ExpectedInstalledServicesAfterStableUpgradeRollback() []string {
+	return slices.DeleteFunc(slices.Clone(ExpectedInstalledServices()), func(s string) bool {
+		return s == dataPlaneServiceName
+	})
+}
+
+// ServicesAbsentAfterStableUpgradeRollback returns services that must not be present
+// after rollback to the last stable release.
+func ServicesAbsentAfterStableUpgradeRollback() []string {
+	return []string{dataPlaneServiceName}
 }
 
 // ExpectedRunningServices returns the list of services expected to be running after installation
