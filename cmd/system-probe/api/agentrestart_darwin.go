@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func kickstart(service string) error {
+var kickstart = func(service string) error {
 	cmd := exec.Command("/bin/launchctl", "kickstart", "-k", service)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

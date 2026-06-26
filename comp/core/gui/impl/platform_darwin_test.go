@@ -6,12 +6,16 @@
 package guiimpl
 
 import (
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const expectedBody = `<!DOCTYPE html>
@@ -132,6 +136,111 @@ const expectedBody = `<!DOCTYPE html>
   </div>
 </body>
 `
+
+// startUnixServer starts an HTTP server on a temp Unix socket and returns its path.
+// Uses os.CreateTemp under /tmp to stay within the 108-char Unix socket path limit on macOS.
+func startUnixServer(t *testing.T, handler http.Handler) string {
+	t.Helper()
+	f, err := os.CreateTemp("", "gui-test-*.sock")
+	require.NoError(t, err)
+	socketPath := f.Name()
+	f.Close()
+	os.Remove(socketPath)
+	t.Cleanup(func() { os.Remove(socketPath) })
+
+	l, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	srv := &http.Server{Handler: handler}
+	go srv.Serve(l) //nolint:errcheck
+	t.Cleanup(func() { srv.Close() })
+	return socketPath
+}
+
+func TestRestartEnabled(t *testing.T) {
+	assert.True(t, restartEnabled())
+}
+
+func TestSetRestartAuthToken(t *testing.T) {
+	orig := restartAuthToken
+	t.Cleanup(func() { restartAuthToken = orig })
+
+	setRestartAuthToken("test-token")
+	assert.Equal(t, "test-token", restartAuthToken)
+}
+
+func TestSetSysprobeSocketPath(t *testing.T) {
+	orig := sysprobeSocketPath
+	t.Cleanup(func() { sysprobeSocketPath = orig })
+
+	setSysprobeSocketPath("/tmp/test.sock")
+	assert.Equal(t, "/tmp/test.sock", sysprobeSocketPath)
+}
+
+func TestRestart_Success(t *testing.T) {
+	socketPath := startUnixServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agent-restart", r.URL.Path)
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	origSocket := sysprobeSocketPath
+	origToken := restartAuthToken
+	t.Cleanup(func() {
+		sysprobeSocketPath = origSocket
+		restartAuthToken = origToken
+	})
+	setSysprobeSocketPath(socketPath)
+	setRestartAuthToken("test-token")
+
+	err := restart()
+	assert.NoError(t, err)
+}
+
+func TestRestart_SysprobeUnreachable(t *testing.T) {
+	orig := sysprobeSocketPath
+	t.Cleanup(func() { sysprobeSocketPath = orig })
+	setSysprobeSocketPath("/tmp/gui-test-nonexistent.sock")
+
+	err := restart()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not reach system-probe")
+}
+
+func TestRestart_SysprobeReturnsError(t *testing.T) {
+	socketPath := startUnixServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "launchctl failed", http.StatusInternalServerError)
+	}))
+
+	orig := sysprobeSocketPath
+	t.Cleanup(func() { sysprobeSocketPath = orig })
+	setSysprobeSocketPath(socketPath)
+
+	err := restart()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "system-probe agent restart failed")
+	assert.Contains(t, err.Error(), "launchctl failed")
+}
+
+func TestRestart_SendsAuthorizationHeader(t *testing.T) {
+	var receivedAuth string
+	socketPath := startUnixServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	origSocket := sysprobeSocketPath
+	origToken := restartAuthToken
+	t.Cleanup(func() {
+		sysprobeSocketPath = origSocket
+		restartAuthToken = origToken
+	})
+	setSysprobeSocketPath(socketPath)
+	setRestartAuthToken("secret-ipc-token")
+
+	require.NoError(t, restart())
+	assert.Equal(t, fmt.Sprintf("Bearer %s", "secret-ipc-token"), receivedAuth)
+}
 
 func TestRenderIndexPage(t *testing.T) {
 	req, err := http.NewRequest("GET", "/", nil)
