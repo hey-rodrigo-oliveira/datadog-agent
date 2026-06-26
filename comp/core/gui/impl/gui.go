@@ -289,6 +289,7 @@ func (g *gui) getAccessToken(w http.ResponseWriter, r *http.Request) {
 		Value:    accessToken,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 		MaxAge:   31536000, // 1 year
 	})
 	http.Redirect(w, r, "/", http.StatusFound)
@@ -299,6 +300,17 @@ func (g *gui) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Disable caching
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+		// For state-changing requests, reject any cross-origin Origin header to prevent CSRF.
+		// Same-origin requests from the GUI itself either omit Origin or match the server address.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if origin := r.Header.Get("Origin"); origin != "" {
+				if origin != "http://"+g.address {
+					http.Error(w, "invalid origin", http.StatusForbidden)
+					return
+				}
+			}
+		}
 
 		cookie, _ := r.Cookie("accessToken")
 		if cookie == nil {
