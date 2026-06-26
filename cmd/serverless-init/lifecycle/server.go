@@ -523,7 +523,14 @@ func (s *Server) aliveCheckReady(w http.ResponseWriter) {
 // handleRun is the only hook that reads r.Body and is therefore not
 // collapsed into dispatchHook directly. The ID is captured before Start
 // so the first heartbeat emission already carries the correct microvm_id tag.
+//
+// SIGUSR2 is sent first (no-forwarder path) so the child can reseed its PRNG
+// before any telemetry work. Skipped when a forwarder is configured.
 func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
+	if s.fwd == nil {
+		s.sendRunSignal()
+	}
+
 	// Read the body once so we can parse the instance ID AND still forward the
 	// original payload to the user app. Without this, the forwarder path would
 	// consume r.Body before the decode, losing the instance_id tag on all
