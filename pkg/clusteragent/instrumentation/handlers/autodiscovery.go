@@ -87,11 +87,8 @@ func (h *AutodiscoveryHandler) Validate(cr *datadoghq.DatadogInstrumentation) []
 		}
 
 		if !isService(cr) {
-			if !hasContainerTarget(check) {
-				errs = append(errs, h.checkValidationError(i, "", "InvalidContainerTarget", "at least one container image or container name is required"))
-			}
-			if hasContainerName(check) && hasContainerImage(check) {
-				errs = append(errs, h.checkValidationError(i, "", "InvalidContainerTarget", "container image and container name cannot both be set"))
+			if !hasContainerName(check) {
+				errs = append(errs, h.checkValidationError(i, "containerName", "InvalidContainerTarget", "container name is required"))
 			}
 		}
 	}
@@ -245,7 +242,7 @@ func rawExtensionToData(raw runtime.RawExtension) (integration.Data, error) {
 	return b, nil
 }
 
-func marshalLogs(logs []datadoghq.DatadogInstrumentationLogFields) (integration.Data, error) {
+func marshalLogs(logs []datadoghq.DatadogInstrumentationLogConfig) (integration.Data, error) {
 	if len(logs) == 0 {
 		return nil, nil
 	}
@@ -266,21 +263,13 @@ func buildCELSelector(ref autoscalingv2.CrossVersionObjectReference, namespace s
 	}
 }
 
-func hasContainerTarget(check datadoghq.DatadogInstrumentationCheckConfig) bool {
-	return hasContainerName(check) || hasContainerImage(check)
-}
-
 func hasContainerName(check datadoghq.DatadogInstrumentationCheckConfig) bool {
 	return strings.TrimSpace(check.ContainerName) != ""
-}
-
-func hasContainerImage(check datadoghq.DatadogInstrumentationCheckConfig) bool {
-	return len(check.ContainerImage) > 0
 }
 
 func adIdentifiers(check datadoghq.DatadogInstrumentationCheckConfig) []string {
 	if hasContainerName(check) {
 		return []string{adtypes.KubeContainerNameIdentifier(strings.TrimSpace(check.ContainerName))}
 	}
-	return check.ContainerImage
+	return nil
 }
