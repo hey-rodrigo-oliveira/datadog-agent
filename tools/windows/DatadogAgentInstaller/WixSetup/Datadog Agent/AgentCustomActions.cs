@@ -268,7 +268,7 @@ namespace WixSetup.Datadog_Agent
                 Impersonate = false
             }
                 .SetProperties(
-                    "PROJECTLOCATION=[PROJECTLOCATION], APPLICATIONDATADIRECTORY=[APPLICATIONDATADIRECTORY]");
+                    "PROJECTLOCATION=[PROJECTLOCATION], APPLICATIONDATADIRECTORY=[APPLICATIONDATADIRECTORY], CleanupProcessesDOnUninstall=1");
 
             DecompressPythonDistributions = new CustomAction<CustomActions>(
                     new Id(nameof(DecompressPythonDistributions)),

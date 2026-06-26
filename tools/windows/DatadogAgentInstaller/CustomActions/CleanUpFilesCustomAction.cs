@@ -51,6 +51,7 @@ namespace Datadog.CustomActions
             }
 
             TryRemoveProcessesDOnUninstall(session, projectLocation);
+            TryRemoveProcessesDirIfEmpty(session, projectLocation);
 
             return ActionResult.Success;
         }
@@ -62,6 +63,34 @@ namespace Datadog.CustomActions
                 return;
             }
 
+            TryRemoveProcessesDir(session, projectLocation, recursive: true);
+        }
+
+        private static void TryRemoveProcessesDirIfEmpty(ISession session, string projectLocation)
+        {
+            var processesDir = Path.Combine(projectLocation, "processes.d");
+            try
+            {
+                if (!Directory.Exists(processesDir))
+                {
+                    return;
+                }
+
+                if (Directory.EnumerateFileSystemEntries(processesDir).Any())
+                {
+                    return;
+                }
+
+                TryRemoveProcessesDir(session, projectLocation, recursive: false);
+            }
+            catch (Exception e)
+            {
+                session.Log($"Error while checking processes.d directory: {e}");
+            }
+        }
+
+        private static void TryRemoveProcessesDir(ISession session, string projectLocation, bool recursive)
+        {
             var processesDir = Path.Combine(projectLocation, "processes.d");
             try
             {
@@ -71,7 +100,7 @@ namespace Datadog.CustomActions
                 }
 
                 session.Log($"Deleting directory \"{processesDir}\"");
-                Directory.Delete(processesDir, true);
+                Directory.Delete(processesDir, recursive);
             }
             catch (Exception e)
             {
