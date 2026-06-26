@@ -653,7 +653,7 @@ func LoadDatadog(config pkgconfigmodel.Config, secretResolver secrets.Component,
 
 	sanitizeAPIKeyConfig(config, "api_key")
 	sanitizeAPIKeyConfig(config, "logs_config.api_key")
-	sanitizeDataPlaneConfig(config, runtime.GOOS, os.Getenv)
+	SanitizeDataPlaneConfig(config)
 	setNumWorkers(config)
 
 	flareStrippedKeys := config.GetStringSlice("flare_stripped_keys")
@@ -1164,12 +1164,18 @@ func sanitizeAPIKeyConfig(config pkgconfigmodel.Config, key string) {
 	config.Set(key, trimmed, pkgconfigmodel.SourceAgentRuntime)
 }
 
-// sanitizeDataPlaneConfig gates data_plane.enabled to supported platforms.
-// The Agent Data Plane (ADP) is supported on Linux, macOS, and Windows. On unsupported
-// platforms this function always installs a SourceAgentRuntime override of
+// sanitizeDataPlaneConfig gates data_plane.enabled to supported platforms and
+// configurations. The Agent Data Plane (ADP) is supported on Linux, macOS, and
+// Windows. On unsupported platforms, or on Windows when process_manager.enabled
+// is false, this function always installs a SourceAgentRuntime override of
 // false, which beats file and fleet-policy sources and prevents them from
 // re-enabling ADP after this call returns. A warning is emitted only when the
 // value was explicitly set to true at call time.
+//
+// Windows ADP runs only under dd-procmgr (via processes.d); dd-procmgr-service is
+// started by the core Agent only when process_manager.enabled is true. Leaving
+// data_plane.enabled true without procmgr would disable internal DogStatsD
+// while no ADP process is started.
 //
 // The goos parameter is the target OS string (normally runtime.GOOS). It is
 // exposed as a parameter so that tests can exercise both branches without
@@ -1180,13 +1186,34 @@ func sanitizeAPIKeyConfig(config pkgconfigmodel.Config, key string) {
 // When DD_DATA_PLANE_FORCE_ENABLE=true the OS gate is skipped entirely; this
 // is intended for local development on unsupported platforms only.
 func sanitizeDataPlaneConfig(config pkgconfigmodel.Config, goos string, envLookup func(string) string) {
-	if goos == "linux" || goos == "darwin" || goos == "windows" || envLookup("DD_DATA_PLANE_FORCE_ENABLE") == "true" {
+	if envLookup("DD_DATA_PLANE_FORCE_ENABLE") == "true" {
 		return
 	}
-	if config.GetBool(DataPlaneEnabled) {
-		log.Warnf("%s is not supported on %s and will be ignored", DataPlaneEnabled, goos)
+
+	switch {
+	case goos == "linux", goos == "darwin":
+		return
+	case goos == "windows":
+		if config.GetBool("process_manager.enabled") {
+			return
+		}
+		if config.GetBool(DataPlaneEnabled) {
+			log.Warnf("%s requires process_manager.enabled on Windows and will be ignored", DataPlaneEnabled)
+		}
+	default:
+		if config.GetBool(DataPlaneEnabled) {
+			log.Warnf("%s is not supported on %s and will be ignored", DataPlaneEnabled, goos)
+		}
 	}
+
 	config.Set(DataPlaneEnabled, false, pkgconfigmodel.SourceAgentRuntime)
+}
+
+// SanitizeDataPlaneConfig applies sanitizeDataPlaneConfig for the current host.
+// It is also called after fleet policy merging because fleet policies may set
+// process_manager.enabled or data_plane.enabled after the initial LoadDatadog pass.
+func SanitizeDataPlaneConfig(config pkgconfigmodel.Config) {
+	sanitizeDataPlaneConfig(config, runtime.GOOS, os.Getenv)
 }
 
 // sanitizeExternalMetricsProviderChunkSize ensures the value of `external_metrics_provider.chunk_size` is within an acceptable range

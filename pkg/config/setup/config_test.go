@@ -1670,12 +1670,13 @@ func TestLoadProxyFromEnv(t *testing.T) {
 
 func TestSanitizeDataPlaneConfig(t *testing.T) {
 	tests := []struct {
-		name         string
-		goos         string
-		forceEnable  string // value of DD_DATA_PLANE_FORCE_ENABLE
-		initialValue bool
-		wantValue    bool
-		wantSource   pkgconfigmodel.Source
+		name                  string
+		goos                  string
+		forceEnable           string // value of DD_DATA_PLANE_FORCE_ENABLE
+		processManagerEnabled *bool
+		initialValue          bool
+		wantValue             bool
+		wantSource            pkgconfigmodel.Source
 	}{
 		{
 			name:         "linux preserves true",
@@ -1704,6 +1705,32 @@ func TestSanitizeDataPlaneConfig(t *testing.T) {
 			initialValue: false,
 			wantValue:    false,
 			wantSource:   pkgconfigmodel.SourceFile,
+		},
+		{
+			name:                  "windows procmgr disabled resets true to false",
+			goos:                  "windows",
+			processManagerEnabled: boolPtr(false),
+			initialValue:          true,
+			wantValue:             false,
+			wantSource:            pkgconfigmodel.SourceAgentRuntime,
+		},
+		{
+			// Lock false so fleet policies cannot re-enable ADP without procmgr.
+			name:                  "windows procmgr disabled locks false via SourceAgentRuntime",
+			goos:                  "windows",
+			processManagerEnabled: boolPtr(false),
+			initialValue:          false,
+			wantValue:             false,
+			wantSource:            pkgconfigmodel.SourceAgentRuntime,
+		},
+		{
+			name:                  "windows procmgr disabled bypass: force-enable=true preserves true",
+			goos:                  "windows",
+			processManagerEnabled: boolPtr(false),
+			forceEnable:           "true",
+			initialValue:          true,
+			wantValue:             true,
+			wantSource:            pkgconfigmodel.SourceFile,
 		},
 		{
 			// Even when already false, unsupported platforms write SourceAgentRuntime so that
@@ -1769,6 +1796,9 @@ func TestSanitizeDataPlaneConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newTestConf(t)
 			cfg.Set("data_plane.enabled", tt.initialValue, pkgconfigmodel.SourceFile)
+			if tt.processManagerEnabled != nil {
+				cfg.Set("process_manager.enabled", *tt.processManagerEnabled, pkgconfigmodel.SourceFile)
+			}
 
 			envLookup := func(key string) string {
 				if key == "DD_DATA_PLANE_FORCE_ENABLE" {
@@ -1782,4 +1812,8 @@ func TestSanitizeDataPlaneConfig(t *testing.T) {
 			assert.Equal(t, tt.wantSource, cfg.GetSource("data_plane.enabled"))
 		})
 	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
