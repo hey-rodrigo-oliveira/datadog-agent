@@ -7,7 +7,6 @@ package guiimpl
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 
 	sysprobeclient "github.com/DataDog/datadog-agent/pkg/system-probe/api/client"
@@ -63,8 +62,7 @@ func restart() error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("system-probe agent restart failed: %s", string(body))
+		return fmt.Errorf("system-probe agent restart failed with status %d; see system-probe logs for details", resp.StatusCode)
 	}
 	return nil
 }

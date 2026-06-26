@@ -228,8 +228,7 @@ func TestRestart_SysprobeReturnsError(t *testing.T) {
 
 	err := restart()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "system-probe agent restart failed")
-	assert.Contains(t, err.Error(), "launchctl failed")
+	assert.Contains(t, err.Error(), "system-probe agent restart failed with status 500")
 }
 
 func TestRestart_SendsAuthorizationHeader(t *testing.T) {
