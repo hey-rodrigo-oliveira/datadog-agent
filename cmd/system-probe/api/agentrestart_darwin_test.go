@@ -23,7 +23,18 @@ func withMockKickstart(t *testing.T, mock func(string) error) {
 	t.Cleanup(func() { kickstart = orig })
 }
 
+// withSyncAfterFunc replaces the timer so the callback runs synchronously inside
+// handleAgentRestart, before the function returns. This prevents the real kickstart
+// from being restored by t.Cleanup before the timer fires.
+func withSyncAfterFunc(t *testing.T) {
+	t.Helper()
+	orig := afterFunc
+	afterFunc = func(_ time.Duration, f func()) *time.Timer { f(); return nil }
+	t.Cleanup(func() { afterFunc = orig })
+}
+
 func TestHandleAgentRestart_Returns200Immediately(t *testing.T) {
+	withSyncAfterFunc(t)
 	withMockKickstart(t, func(string) error { return nil })
 
 	req := httptest.NewRequest(http.MethodPost, "/agent-restart", nil)
@@ -42,14 +53,11 @@ func TestHandleAgentRestart_ServiceRestartSequence(t *testing.T) {
 		"system/com.datadoghq.sysprobe",
 	}
 
-	var called []string
-	done := make(chan struct{})
+	withSyncAfterFunc(t)
 
+	var called []string
 	withMockKickstart(t, func(svc string) error {
 		called = append(called, svc)
-		if len(called) == len(expectedServices) {
-			close(done)
-		}
 		return nil
 	})
 
@@ -58,14 +66,6 @@ func TestHandleAgentRestart_ServiceRestartSequence(t *testing.T) {
 
 	handleAgentRestart(rr, req)
 
-	// Response must be 200 before the goroutine fires.
 	assert.Equal(t, http.StatusOK, rr.Code)
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("kickstart was not called within timeout")
-	}
-
 	assert.Equal(t, expectedServices, called)
 }

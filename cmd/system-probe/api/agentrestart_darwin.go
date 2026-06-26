@@ -16,6 +16,8 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
+var afterFunc = time.AfterFunc
+
 var kickstart = func(service string) error {
 	cmd := exec.Command("/bin/launchctl", "kickstart", "-k", service)
 	out, err := cmd.CombinedOutput()
@@ -35,7 +37,7 @@ func handleAgentRestart(w http.ResponseWriter, r *http.Request) {
 
 	// Restart both services after a short delay so the HTTP response has time
 	// to be delivered before launchd sends SIGTERM to this process.
-	time.AfterFunc(100*time.Millisecond, func() {
+	afterFunc(100*time.Millisecond, func() {
 		if err := kickstart("system/com.datadoghq.agent"); err != nil {
 			log.Errorf("agent-restart: failed to restart com.datadoghq.agent: %v", err)
 		}
