@@ -1,0 +1,63 @@
+name: Sync from upstream
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # every Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/DataDog/datadog-agent.git
+          git fetch upstream --no-tags
+
+      - name: Attempt merge into sync branch
+        id: merge
+        run: |
+          BRANCH="sync/upstream-$(date +%Y-%m-%d)"
+          git checkout -b "$BRANCH"
+          if git merge upstream/main --no-edit; then
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "conflict=false"  >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort
+            # Fall back to a clean merge commit for PR review
+            git merge upstream/main --no-edit --strategy=ours || true
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "conflict=true"   >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push sync branch
+        run: git push origin "${{ steps.merge.outputs.branch }}" --force
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.merge.outputs.branch }}
+          base: master
+          title: "chore: sync from upstream DataDog/datadog-agent (${{ github.run_id }})"
+          body: |
+            Automated sync from [DataDog/datadog-agent](https://github.com/DataDog/datadog-agent) `main`.
+
+            ${{ steps.merge.outputs.conflict == 'true' && '⚠️ **Merge conflicts detected** — this PR needs manual conflict resolution before merging.' || '✅ Clean merge — review and merge when ready.' }}
+          labels: upstream-sync
+          draft: ${{ steps.merge.outputs.conflict == 'true' }}
