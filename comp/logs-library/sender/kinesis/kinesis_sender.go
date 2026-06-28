@@ -23,10 +23,14 @@ import (
 )
 
 const (
-	configKeyStream      = "logs_config.kinesis_firehose_delivery_stream"
-	configKeyRegion      = "logs_config.kinesis_firehose_region"
-	configKeyEndpointURL = "logs_config.kinesis_firehose_endpoint_url"
-	configKeySampleRate  = "logs_config.kinesis_firehose_sample_rate"
+	configKeyStream   = "logs_config.kinesis_firehose_delivery_stream"
+	configKeyRegion   = "logs_config.kinesis_firehose_region"
+	configKeyEndpoint = "logs_config.kinesis_firehose_endpoint_url"
+	// configKeySampling holds a comma-separated list of "pattern=rate%" rules.
+	// Example: "source:nginx=0.01,service:payments=10,tag:env:prod=50"
+	// Patterns: source:<name>, service:<name>, tag:<key>:<value>
+	// Rate: percentage 0.01–100. Logs not matching any rule are sent at 100%.
+	configKeySampling = "logs_config.kinesis_firehose_sampling"
 )
 
 // IsEnabled reports whether the Kinesis Firehose destination is configured.
@@ -50,15 +54,18 @@ func NewKinesisSender(
 ) (*sender.Sender, error) {
 	streamName := cfg.GetString(configKeyStream)
 	region := cfg.GetString(configKeyRegion)
-	endpointURL := cfg.GetString(configKeyEndpointURL)
-	sampleRate := cfg.GetFloat64(configKeySampleRate)
-	if sampleRate <= 0 || sampleRate > 1.0 {
-		sampleRate = 1.0
+	endpointURL := cfg.GetString(configKeyEndpoint)
+
+	samplingRules, err := kinesisclient.ParseSamplingRules(cfg.GetString(configKeySampling))
+	if err != nil {
+		log.Warnf("kinesis sender: invalid sampling config, sending all logs: %v", err)
+		samplingRules = nil
 	}
 
-	log.Infof("kinesis sender: routing logs to Firehose stream %q (region=%q, endpoint=%q, sample_rate=%.2f)", streamName, region, endpointURL, sampleRate)
+	log.Infof("kinesis sender: routing logs to Firehose stream %q (region=%q, endpoint=%q, sampling_rules=%d)",
+		streamName, region, endpointURL, len(samplingRules))
 
-	factory := kinesisDestinationFactory(streamName, region, endpointURL, componentName, sampleRate, pipelineMonitor)
+	factory := kinesisDestinationFactory(streamName, region, endpointURL, componentName, samplingRules, pipelineMonitor)
 
 	return sender.NewSender(
 		cfg,
@@ -74,13 +81,13 @@ func NewKinesisSender(
 
 func kinesisDestinationFactory(
 	streamName, region, endpointURL, componentName string,
-	sampleRate float64,
+	samplingRules []kinesisclient.SamplingRule,
 	pipelineMonitor metrics.PipelineMonitor,
 ) sender.DestinationFactory {
 	return func(instanceID string) *client.Destinations {
 		destMeta := client.NewDestinationMetadata(componentName, instanceID, "reliable", strconv.Itoa(0), "")
 
-		dest, err := kinesisclient.NewDestination(streamName, region, endpointURL, sampleRate, destMeta)
+		dest, err := kinesisclient.NewDestination(streamName, region, endpointURL, samplingRules, destMeta)
 		if err != nil {
 			log.Errorf("kinesis sender: failed to create Firehose destination for stream %q: %v", streamName, err)
 			return client.NewDestinations(nil, nil)

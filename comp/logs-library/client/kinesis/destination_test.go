@@ -35,7 +35,7 @@ func (m *mockFirehose) PutRecord(_ context.Context, in *firehose.PutRecordInput,
 
 func newTestDestination(fh firehoseClient) *Destination {
 	meta := client.NewDestinationMetadata("test", "0", "reliable", "0", "")
-	return newDestinationWithClient("test-stream", fh, 1.0, meta)
+	return newDestinationWithClient("test-stream", fh, nil, meta)
 }
 
 func TestDestinationSendsPayload(t *testing.T) {
@@ -134,41 +134,61 @@ func TestDestinationTruncatesOversizedPayload(t *testing.T) {
 	assert.Len(t, fh.calls[0].Record.Data, maxRecordBytes)
 }
 
-func TestDestinationSamplingDropsMostPayloads(t *testing.T) {
+func TestDestinationSamplingDropsBySource(t *testing.T) {
 	fh := &mockFirehose{}
+	// 0% for "nginx" source → nothing shipped
+	rules, err := ParseSamplingRules("source:nginx=0")
+	require.NoError(t, err)
+
 	meta := client.NewDestinationMetadata("test", "0", "reliable", "0", "")
-	dest := newDestinationWithClient("test-stream", fh, 0.0, meta) // 0% sample rate → ship nothing
+	dest := newDestinationWithClient("test-stream", fh, rules, meta)
 
-	input := make(chan *message.Payload, 10)
-	output := make(chan *message.Payload, 10)
-
-	stop := dest.Start(input, output, nil)
-	for i := 0; i < 10; i++ {
-		input <- &message.Payload{Encoded: []byte("log")}
-	}
-	close(input)
-	<-stop
-
-	assert.Len(t, fh.calls, 0, "0%% sample rate should ship nothing")
-	assert.Len(t, output, 10, "sampled-out payloads must still be acked on output")
-}
-
-func TestDestinationSamplingShipsAll(t *testing.T) {
-	fh := &mockFirehose{}
-	meta := client.NewDestinationMetadata("test", "0", "reliable", "0", "")
-	dest := newDestinationWithClient("test-stream", fh, 1.0, meta) // 100% → ship all
+	nginxOrigin := &message.Origin{}
+	nginxOrigin.SetSource("nginx")
 
 	input := make(chan *message.Payload, 5)
 	output := make(chan *message.Payload, 5)
 
 	stop := dest.Start(input, output, nil)
 	for i := 0; i < 5; i++ {
-		input <- &message.Payload{Encoded: []byte("log")}
+		input <- &message.Payload{
+			Encoded:      []byte("log"),
+			MessageMetas: []*message.MessageMetadata{{Origin: nginxOrigin}},
+		}
 	}
 	close(input)
 	<-stop
 
-	assert.Len(t, fh.calls, 5, "100%% sample rate should ship everything")
+	assert.Len(t, fh.calls, 0, "0%% rule should ship nothing")
+	assert.Len(t, output, 5, "sampled-out payloads must still be acked")
+}
+
+func TestDestinationSamplingUnmatchedSendsAll(t *testing.T) {
+	fh := &mockFirehose{}
+	// Rule only covers nginx; these payloads have source=postgres → 100%
+	rules, err := ParseSamplingRules("source:nginx=0")
+	require.NoError(t, err)
+
+	meta := client.NewDestinationMetadata("test", "0", "reliable", "0", "")
+	dest := newDestinationWithClient("test-stream", fh, rules, meta)
+
+	pgOrigin := &message.Origin{}
+	pgOrigin.SetSource("postgres")
+
+	input := make(chan *message.Payload, 5)
+	output := make(chan *message.Payload, 5)
+
+	stop := dest.Start(input, output, nil)
+	for i := 0; i < 5; i++ {
+		input <- &message.Payload{
+			Encoded:      []byte("log"),
+			MessageMetas: []*message.MessageMetadata{{Origin: pgOrigin}},
+		}
+	}
+	close(input)
+	<-stop
+
+	assert.Len(t, fh.calls, 5, "unmatched logs must be sent at 100%%")
 }
 
 func TestDestinationMetadata(t *testing.T) {
