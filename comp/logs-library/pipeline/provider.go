@@ -19,6 +19,7 @@ import (
 	"github.com/DataDog/datadog-agent/comp/logs-library/metrics"
 	"github.com/DataDog/datadog-agent/comp/logs-library/sender"
 	httpsender "github.com/DataDog/datadog-agent/comp/logs-library/sender/http"
+	kinesissender "github.com/DataDog/datadog-agent/comp/logs-library/sender/kinesis"
 	tcpsender "github.com/DataDog/datadog-agent/comp/logs-library/sender/tcp"
 	"github.com/DataDog/datadog-agent/comp/logs/agent/config"
 	logscompression "github.com/DataDog/datadog-agent/comp/serializer/logscompression/def"
@@ -27,6 +28,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/logs/diagnostic"
 	"github.com/DataDog/datadog-agent/pkg/logs/message"
 	"github.com/DataDog/datadog-agent/pkg/logs/status/statusinterface"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/startstop"
 )
 
@@ -100,7 +102,15 @@ func NewProvider(
 	var senderImpl sender.PipelineComponent
 	serverlessMeta := sender.NewServerlessMeta(serverless)
 
-	if endpoints.UseHTTP {
+	if kinesissender.IsEnabled(cfg) {
+		s, err := kinesissender.NewKinesisSender(cfg, sink, cfg.GetInt("logs_config.payload_channel_size"), serverlessMeta, componentName, sender.DefaultQueuesCount, sender.DefaultWorkersPerQueue, metrics.NewTelemetryPipelineMonitor())
+		if err != nil {
+			log.Errorf("kinesis sender: failed to initialize, falling back to HTTP: %v", err)
+			senderImpl = httpSender(numberOfPipelines, cfg, sink, endpoints, destinationsContext, serverlessMeta, legacyMode, secretsComp)
+		} else {
+			senderImpl = s
+		}
+	} else if endpoints.UseHTTP {
 		senderImpl = httpSender(numberOfPipelines, cfg, sink, endpoints, destinationsContext, serverlessMeta, legacyMode, secretsComp)
 	} else {
 		senderImpl = tcpSender(numberOfPipelines, cfg, sink, endpoints, destinationsContext, status, serverlessMeta, legacyMode)
