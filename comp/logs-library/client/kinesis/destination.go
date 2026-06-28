@@ -10,6 +10,7 @@ package kinesis
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -46,6 +47,7 @@ type Destination struct {
 	destMeta   *client.DestinationMetadata
 	isMRF      bool
 	backoff    backoff.Policy
+	sampleRate float64 // fraction of payloads to ship (0.0–1.0); 1.0 = ship all
 	mu         sync.Mutex
 	nbErrors   int
 	wg         sync.WaitGroup
@@ -56,7 +58,11 @@ type Destination struct {
 // leave empty to use the standard regional endpoint.
 // Maps to config key logs_config.kinesis_firehose_endpoint_url /
 // env var DD_LOGS_CONFIG_KINESIS_FIREHOSE_ENDPOINT_URL.
-func NewDestination(streamName, region, endpointURL string, meta *client.DestinationMetadata) (*Destination, error) {
+// NewDestination creates a Firehose destination using the default AWS credential chain.
+// endpointURL overrides the Firehose endpoint (e.g. for LocalStack or VPC endpoints);
+// leave empty to use the standard regional endpoint.
+// sampleRate is the fraction of payloads to ship (0.0–1.0); use 1.0 to ship all.
+func NewDestination(streamName, region, endpointURL string, sampleRate float64, meta *client.DestinationMetadata) (*Destination, error) {
 	loadOpts := []func(*awsconfig.LoadOptions) error{awsconfig.WithRegion(region)}
 	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), loadOpts...)
 	if err != nil {
@@ -69,14 +75,15 @@ func NewDestination(streamName, region, endpointURL string, meta *client.Destina
 			o.BaseEndpoint = aws.String(endpointURL)
 		})
 	}
-	return newDestinationWithClient(streamName, firehose.NewFromConfig(cfg, clientOpts...), meta), nil
+	return newDestinationWithClient(streamName, firehose.NewFromConfig(cfg, clientOpts...), sampleRate, meta), nil
 }
 
 // newDestinationWithClient is used in tests to inject a mock Firehose client.
-func newDestinationWithClient(streamName string, fh firehoseClient, meta *client.DestinationMetadata) *Destination {
+func newDestinationWithClient(streamName string, fh firehoseClient, sampleRate float64, meta *client.DestinationMetadata) *Destination {
 	return &Destination{
 		streamName: streamName,
 		fh:         fh,
+		sampleRate: sampleRate,
 		destMeta:   meta,
 		backoff:    backoff.NewExpBackoffPolicy(minBackoffFactor, baseBackoffSeconds, maxBackoffSeconds, recoveryInterval, false),
 	}
@@ -128,6 +135,12 @@ func (d *Destination) sendWithRetry(
 	output chan *message.Payload,
 	isRetrying chan bool,
 ) {
+	if d.sampleRate < 1.0 && rand.Float64() >= d.sampleRate {
+		if output != nil {
+			output <- payload
+		}
+		return
+	}
 	for {
 		d.mu.Lock()
 		n := d.nbErrors

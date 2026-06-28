@@ -35,7 +35,7 @@ func (m *mockFirehose) PutRecord(_ context.Context, in *firehose.PutRecordInput,
 
 func newTestDestination(fh firehoseClient) *Destination {
 	meta := client.NewDestinationMetadata("test", "0", "reliable", "0", "")
-	return newDestinationWithClient("test-stream", fh, meta)
+	return newDestinationWithClient("test-stream", fh, 1.0, meta)
 }
 
 func TestDestinationSendsPayload(t *testing.T) {
@@ -132,6 +132,43 @@ func TestDestinationTruncatesOversizedPayload(t *testing.T) {
 
 	require.Len(t, fh.calls, 1)
 	assert.Len(t, fh.calls[0].Record.Data, maxRecordBytes)
+}
+
+func TestDestinationSamplingDropsMostPayloads(t *testing.T) {
+	fh := &mockFirehose{}
+	meta := client.NewDestinationMetadata("test", "0", "reliable", "0", "")
+	dest := newDestinationWithClient("test-stream", fh, 0.0, meta) // 0% sample rate → ship nothing
+
+	input := make(chan *message.Payload, 10)
+	output := make(chan *message.Payload, 10)
+
+	stop := dest.Start(input, output, nil)
+	for i := 0; i < 10; i++ {
+		input <- &message.Payload{Encoded: []byte("log")}
+	}
+	close(input)
+	<-stop
+
+	assert.Len(t, fh.calls, 0, "0%% sample rate should ship nothing")
+	assert.Len(t, output, 10, "sampled-out payloads must still be acked on output")
+}
+
+func TestDestinationSamplingShipsAll(t *testing.T) {
+	fh := &mockFirehose{}
+	meta := client.NewDestinationMetadata("test", "0", "reliable", "0", "")
+	dest := newDestinationWithClient("test-stream", fh, 1.0, meta) // 100% → ship all
+
+	input := make(chan *message.Payload, 5)
+	output := make(chan *message.Payload, 5)
+
+	stop := dest.Start(input, output, nil)
+	for i := 0; i < 5; i++ {
+		input <- &message.Payload{Encoded: []byte("log")}
+	}
+	close(input)
+	<-stop
+
+	assert.Len(t, fh.calls, 5, "100%% sample rate should ship everything")
 }
 
 func TestDestinationMetadata(t *testing.T) {

@@ -26,6 +26,7 @@ const (
 	configKeyStream      = "logs_config.kinesis_firehose_delivery_stream"
 	configKeyRegion      = "logs_config.kinesis_firehose_region"
 	configKeyEndpointURL = "logs_config.kinesis_firehose_endpoint_url"
+	configKeySampleRate  = "logs_config.kinesis_firehose_sample_rate"
 )
 
 // IsEnabled reports whether the Kinesis Firehose destination is configured.
@@ -50,10 +51,14 @@ func NewKinesisSender(
 	streamName := cfg.GetString(configKeyStream)
 	region := cfg.GetString(configKeyRegion)
 	endpointURL := cfg.GetString(configKeyEndpointURL)
+	sampleRate := cfg.GetFloat64(configKeySampleRate)
+	if sampleRate <= 0 || sampleRate > 1.0 {
+		sampleRate = 1.0
+	}
 
-	log.Infof("kinesis sender: routing logs to Firehose stream %q (region=%q, endpoint=%q)", streamName, region, endpointURL)
+	log.Infof("kinesis sender: routing logs to Firehose stream %q (region=%q, endpoint=%q, sample_rate=%.2f)", streamName, region, endpointURL, sampleRate)
 
-	factory := kinesisDestinationFactory(streamName, region, endpointURL, componentName, pipelineMonitor)
+	factory := kinesisDestinationFactory(streamName, region, endpointURL, componentName, sampleRate, pipelineMonitor)
 
 	return sender.NewSender(
 		cfg,
@@ -69,12 +74,13 @@ func NewKinesisSender(
 
 func kinesisDestinationFactory(
 	streamName, region, endpointURL, componentName string,
+	sampleRate float64,
 	pipelineMonitor metrics.PipelineMonitor,
 ) sender.DestinationFactory {
 	return func(instanceID string) *client.Destinations {
 		destMeta := client.NewDestinationMetadata(componentName, instanceID, "reliable", strconv.Itoa(0), "")
 
-		dest, err := kinesisclient.NewDestination(streamName, region, endpointURL, destMeta)
+		dest, err := kinesisclient.NewDestination(streamName, region, endpointURL, sampleRate, destMeta)
 		if err != nil {
 			log.Errorf("kinesis sender: failed to create Firehose destination for stream %q: %v", streamName, err)
 			return client.NewDestinations(nil, nil)
