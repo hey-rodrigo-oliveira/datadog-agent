@@ -52,12 +52,24 @@ type Destination struct {
 }
 
 // NewDestination creates a Firehose destination using the default AWS credential chain.
-func NewDestination(streamName, region string, meta *client.DestinationMetadata) (*Destination, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(region))
+// endpointURL overrides the Firehose endpoint (e.g. for LocalStack or VPC endpoints);
+// leave empty to use the standard regional endpoint.
+// Maps to config key logs_config.kinesis_firehose_endpoint_url /
+// env var DD_LOGS_CONFIG_KINESIS_FIREHOSE_ENDPOINT_URL.
+func NewDestination(streamName, region, endpointURL string, meta *client.DestinationMetadata) (*Destination, error) {
+	loadOpts := []func(*awsconfig.LoadOptions) error{awsconfig.WithRegion(region)}
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("kinesis destination: failed to load AWS config: %w", err)
 	}
-	return newDestinationWithClient(streamName, firehose.NewFromConfig(cfg), meta), nil
+
+	var clientOpts []func(*firehose.Options)
+	if endpointURL != "" {
+		clientOpts = append(clientOpts, func(o *firehose.Options) {
+			o.BaseEndpoint = aws.String(endpointURL)
+		})
+	}
+	return newDestinationWithClient(streamName, firehose.NewFromConfig(cfg, clientOpts...), meta), nil
 }
 
 // newDestinationWithClient is used in tests to inject a mock Firehose client.
