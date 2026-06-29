@@ -9,6 +9,9 @@
   },
   "author": "",
   "dependencies": {
-    "dd-trace": "^5.73.0"
+    "dd-trace": "^5.73.0",
+    "path-to-regexp": "^0.1.13",
+    "protobufjs": "^8.0.2",
+    "shell-quote": "^1.8.4"
   }
 }
